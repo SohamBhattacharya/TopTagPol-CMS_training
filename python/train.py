@@ -4,6 +4,7 @@
 from __future__ import print_function
 
 #import mxnet
+import argparse
 import awkward
 import collections
 #import cppyy
@@ -463,7 +464,22 @@ def computeBins(
 #@memory_profiler.profile
 def main() :
     
-    d_loadConfig = utils.load_config("configs/test_config.yml")
+    # Argument parser
+    parser = argparse.ArgumentParser(formatter_class = argparse.RawTextHelpFormatter)
+    
+    parser.add_argument(
+        "--config",
+        help = "Configuration file",
+        type = str,
+        required = True,
+    )
+    
+    
+    args = parser.parse_args()
+    d_args = vars(args)
+    
+    
+    d_loadConfig = utils.load_config(args.config)
     
     
     imgSpec = ImageSpec(
