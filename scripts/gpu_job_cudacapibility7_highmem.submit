@@ -1,0 +1,18 @@
+universe = vanilla
+
+executable = @exe@
+log = @log@
+output = @out@
+error = @err@
+
+should_transfer_files = IF_NEEDED
+when_to_transfer_output = ON_EXIT
+
+getenv = True
+
+Requirements = (OpSysAndVer == "CentOS7") && (CUDACapability == 7.0)
+Request_GPUs = 1
+request_memory = 100GB
++RequestRuntime = 345600
+
+queue
