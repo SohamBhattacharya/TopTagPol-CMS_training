@@ -1,0 +1,13 @@
+#*#
+*.pdf
+*.png
+*.pyc
+*.root
+*__pycache__*
+*debug*
+*plots*
+*log*
+*training_results*
+*~
+.#*
+.*.swp
