@@ -1181,13 +1181,27 @@ def main() :
         log_dir = tensorboard_dir,
         histogram_freq = 1,
         write_graph = True,
-        write_images = True,
+        write_images = False,
         write_steps_per_second = False,
         update_freq = "epoch",
-        profile_batch = (1, nBatch_trn),
+        #profile_batch = (1, nBatch_trn),
+        profile_batch = nBatch_trn,
         embeddings_freq = 0,
         embeddings_metadata = None,
     )
+    
+    
+    class CustomCallback(tensorflow.keras.callbacks.Callback):
+        
+        def on_epoch_end(self, epoch, logs=None):
+            
+            keys = list(logs.keys())
+            print("End epoch {} of training; got log keys: {}".format(epoch, keys))
+            
+            add_hist_trn = tensorflow.summary.histogram("output_trn", self.model.predict(dataset_trn).flatten())#, step = epoch)
+            add_hist_tst = tensorflow.summary.histogram("output_tst", self.model.predict(dataset_tst).flatten())#, step = epoch)
+            print(add_hist_trn, add_hist_tst)
+            tensorflow.summary.scalar("epoch", data = epoch)#, step = epoch)
     
     
     print("=====> Starting fit... Memory:", getMemoryMB())
@@ -1201,7 +1215,7 @@ def main() :
         #max_queue_size = 20,
         #use_multiprocessing = True,
         #workers = nCpu_use,
-        callbacks = [checkpoint_callback, tensorboard_callback]
+        callbacks = [checkpoint_callback, tensorboard_callback, CustomCallback()]
     )
 
 

@@ -11,14 +11,14 @@
 The model will be saved in `training_results/model_checkpoints` with the date and time.
 The tensorboard info will be saved in `training_results/tensorboard` with the date and time.
 
-# Submit a training job over a large dataset
-1. Inititialize the conda environment and cd to the training directory.
+# Submit a training job over a dataset
+1. Initialize the conda environment and cd to the training directory.
 2. `python -u python/run_condor.py --tag <tag> --trainconfig <trainconfig> --condorconfig <condorconfig>`.
     * Use a meaningful name for `<tag>` (no spaces or special characters except `-` and `_`).
     * `<trainconfig>`: the training config file you want. This will be copied. The copied file can be edited before submission.
     * `<condorconfig>`: \
-    For large dataset (about 100K or more per sample): `gpu_interactive_cudacapibility7_highmem.submit`. \
-    For small dataset (about 10K or fewer per sample): `gpu_interactive.submit`.
+    For a large dataset (about 100K or more per sample): `condor_config_highmem_template.submit`. \
+    For a small dataset (about 10K or fewer per sample): `condor_config_template.submit`.
 3. This will create and list a few files. **Check them (especially the training config file) before submitting**.
 4. If things look okay, submit using: `condor_submit <submit file>`. \
     Here `<submit file>` is the same as that printed by the previous command.
