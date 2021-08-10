@@ -22,10 +22,13 @@ The tensorboard info will be saved in `training_results/tensorboard` with the da
 3. This will create and list a few files. **Check them (especially the training config file) before submitting**.
 4. If things look okay, submit using: `condor_submit <submit file>`. \
     Here `<submit file>` is the same as that printed by the previous command.
-5. Check the status of the condor job(s) with: `condor_q <username>`
-6. Once the job starts to run, it will create `job.out` in the condor directory. To monitor it, do `tail -f <file>`.
-7. Warnings and errors will be in `job.err`.
-8. Once the training starts, the model checkpoint and tensorboard directories will be created, and the latter can be viewed on a browser, even when the training is ongoing.
+5. Check the status of the condor job(s) with: `condor_q <username>`.
+6. If you want to abort your job(s):
+    * `condor_rm <jobid>` will abort a particular condor job.
+    * `condor_rm -u <username>` will abort all your condor jobs.
+7. Once the job starts to run, it will create `job.out` in the condor directory. To monitor it, do `tail -f <file>`.
+8. Warnings and errors will be in `job.err`.
+9. Once the training starts, the model checkpoint and tensorboard directories will be created, and the latter can be viewed on a browser, even when the training is ongoing.
 
 # View the tensorboard page
 1. On another shell, login to NAF, cd to the training directory and run one of the following:
