@@ -18,18 +18,19 @@ The tensorboard info will be saved in `training_results/tensorboard` with the da
     * `<trainconfig>`: the training config file you want. This will be copied. The copied file can be edited before submission.
     * `<condorconfig>`: \
     For large dataset (about 100K or more per sample): `gpu_interactive_cudacapibility7_highmem.submit`. \
-    For small dataset (about 10K or fewer per sample): `gpu_interactive.submit`. \
-3. This will create and list a few files. **Check them (especially the training config file) before submitting**. \
+    For small dataset (about 10K or fewer per sample): `gpu_interactive.submit`.
+3. This will create and list a few files. **Check them (especially the training config file) before submitting**.
 4. If things look okay, submit using: `condor_submit <submit file>`. \
     Here `<submit file>` is the same as that printed by the previous command.
-5. Check the status of the condor job with: `condor_q <username>`
+5. Check the status of the condor job(s) with: `condor_q <username>`
 6. Once the job starts to run, it will create `job.out` in the condor directory. To monitor it, do `tail -f <file>`.
-7. Once the training starts, the model checkpoint and tensorboard directories will be created, and the latter can be viewed on a browser, even when the training is ongoing.
+7. Warnings and errors will be in `job.err`.
+8. Once the training starts, the model checkpoint and tensorboard directories will be created, and the latter can be viewed on a browser, even when the training is ongoing.
 
 # View the tensorboard page
 1. On another shell, login to NAF, cd to the training directory and run one of the following:
     * Particular training(s): \
-    `tensorboard --logdir training_results/tensorboard/<dir1> training_results/tensorboard/<dir2> ...`.
+    `tensorboard --logdir training_results/tensorboard/<dir1> training_results/tensorboard/<dir2> ...`. \
     Here `<dirN>` is any particular training under `training_results/tensorboard`.
     * The latest training (by date and time): \
     `tensorboard --logdir $(find training_results/tensorboard/ -maxdepth 1 | sort -V | tail -n 1)`.
