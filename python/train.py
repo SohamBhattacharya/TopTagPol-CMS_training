@@ -480,6 +480,7 @@ def main() :
     
     
     d_loadConfig = utils.load_config(args.config)
+    #print(d_loadConfig)
     
     
     imgSpec = ImageSpec(

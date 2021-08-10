@@ -134,9 +134,11 @@ def replace_in_dict(d, find, repl) :
 
 def load_config(fileName) :
     
-    with open("configs/test_config.yml", "r") as fopen :
+    with open(fileName, "r") as fopen :
         
         fileContent = fopen.read()
+        print("Loading config:")
+        print(fileContent)
         
         d_loadConfig = yaml.load(fileContent, Loader = yaml.FullLoader)
         
