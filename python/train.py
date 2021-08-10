@@ -474,9 +474,45 @@ def main() :
         required = True,
     )
     
+    parser.add_argument(
+        "--tag",
+        help = "Tag (will create the training directory <tag>. If omitted, will use <datetime>.)",
+        type = str,
+        required = False,
+    )
+    
+    parser.add_argument(
+        "--outdirbase",
+        help = "Base output directory",
+        type = str,
+        required = False,
+        default = "training_results",
+    )
+    
     
     args = parser.parse_args()
     d_args = vars(args)
+    
+    
+    out_tag = args.tag
+    
+    if (out_tag is None or not len(out_tag.strip())) :
+        
+        out_tag = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    
+    checkpoint_dir = "%s/model_checkpoints/%s" %(args.outdirbase, out_tag)
+    tensorboard_dir = "%s/tensorboard/%s" %(args.outdirbase, out_tag)
+    
+    for dirname in [checkpoint_dir, tensorboard_dir] :
+        
+        if (os.path.exists(dirname)) :
+            
+            print("Error. Directory already exists: %s" %(dirname))
+            exit(1)
+    
+    
+    print("Model checkpoint dir: %s" %(checkpoint_dir))
+    print("Tensorboard dir: %s" %(tensorboard_dir))
     
     
     d_loadConfig = utils.load_config(args.config)
@@ -1008,9 +1044,23 @@ def main() :
     batch_size = d_loadConfig["batchSize"]
     nBatch_trn = int(numpy.ceil(nJetTot_trn/float(batch_size))) # + int(len(arr_shuffledIdx)%batch_size > 0)
     
+    def print_nJet(d_catInfo) :
+        
+        for (iCat, cat) in enumerate(d_catInfo.keys()) :
+            
+            catInfo = d_catInfo[cat]
+            
+            print(
+                "Category %d: nJet %d %s" %(
+                iCat,
+                catInfo.nJet,
+                str(catInfo.l_sample_nJet),
+            ))
     
     print("nJetTot_trn:", nJetTot_trn, [d_catInfo_trn[key].nJet for key in d_catInfo_trn])
+    print_nJet(d_catInfo_trn)
     print("nJetTot_tst:", nJetTot_tst, [d_catInfo_tst[key].nJet for key in d_catInfo_tst])
+    print_nJet(d_catInfo_tst)
     
     
     ##### Dataset debug plot #####
@@ -1112,11 +1162,7 @@ def main() :
     print("=====> Compiled model... Memory:", getMemoryMB())
     
     
-    base_result_dir = "training_results"
-    
-    out_tag = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    
-    checkpoint_file = "%s/model_checkpoints/%s/weights_{epoch:d}.hdf5" %(base_result_dir, out_tag)
+    checkpoint_file = "%s/weights_{epoch:d}.hdf5" %(checkpoint_dir)
     
     checkpoint_callback  =  tensorflow.keras.callbacks.ModelCheckpoint(
         filepath = checkpoint_file,
@@ -1131,8 +1177,6 @@ def main() :
     )
     
     
-    tensorboard_dir = "%s/tensorboard/%s" %(base_result_dir, out_tag)
-    
     tensorboard_callback = tensorflow.keras.callbacks.TensorBoard(
         log_dir = tensorboard_dir,
         histogram_freq = 1,
@@ -1144,6 +1188,7 @@ def main() :
         embeddings_freq = 0,
         embeddings_metadata = None,
     )
+    
     
     print("=====> Starting fit... Memory:", getMemoryMB())
     
@@ -1164,3 +1209,8 @@ def main() :
 if (__name__ == "__main__") :
     
     main()
+
+
+#from torch.utils.tensorboard import SummaryWriter 
+#writer = SummaryWriter() 
+#writer.add_scalar(“Output”, output, iter_num) 
