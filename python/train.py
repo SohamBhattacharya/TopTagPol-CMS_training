@@ -391,10 +391,14 @@ def computeBins(
                 
                 for iConsti in a_nonzero_idx :
                     
+                    # Prevent underflow and overflow
+                    x = min(max(0, a_x[iConsti]), layerInfo.nBinX-1)
+                    y = min(max(0, a_y[iConsti]), layerInfo.nBinY-1)
+                    
                     key = (
                         numpy.uint32(jetIdxOffset+jetIdx),
-                        a_y[iConsti],
-                        a_x[iConsti],
+                        y,
+                        x,
                         numpy.uint32(layerInfo.layerIdx),
                     )
                     
