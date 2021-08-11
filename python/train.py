@@ -99,6 +99,7 @@ class LayerInfo :
     def __init__(
         self,
         layerIdx,
+        imgSpec,
         valueBranch,
         cutBranch,
         resolverOperation,
@@ -107,6 +108,8 @@ class LayerInfo :
     ) :
         
         self.layerIdx = layerIdx
+        
+        self.imgSpec = imgSpec
         
         self.valueBranch = valueBranch
         self.cutBranch = cutBranch
@@ -391,14 +394,10 @@ def computeBins(
                 
                 for iConsti in a_nonzero_idx :
                     
-                    # Prevent underflow and overflow
-                    x = min(max(0, a_x[iConsti]), layerInfo.nBinX-1)
-                    y = min(max(0, a_y[iConsti]), layerInfo.nBinY-1)
-                    
                     key = (
                         numpy.uint32(jetIdxOffset+jetIdx),
-                        y,
-                        x,
+                        a_y[iConsti],
+                        a_x[iConsti],
                         numpy.uint32(layerInfo.layerIdx),
                     )
                     
@@ -534,16 +533,18 @@ def main() :
         yMax = d_loadConfig["yVar"]["max"],
     )
     
-    xVar = "({xVar} - {xMin}) / {xBinWidth}".format(
+    xVar = "min(max(0, ({xVar} - {xMin}) / {xBinWidth}), {nBinX})".format(
         xVar = d_loadConfig["xVar"]["branch"],
         xMin = imgSpec.xMin,
         xBinWidth = imgSpec.xBinWidth,
+        nBinX = imgSpec.nBinX-1,
     )
     
-    yVar = "({yVar} - {yMin}) / {yBinWidth}".format(
+    yVar = "min(max(0, ({yVar} - {yMin}) / {yBinWidth}), {nBinY})".format(
         yVar = d_loadConfig["yVar"]["branch"],
         yMin = imgSpec.yMin,
         yBinWidth = imgSpec.yBinWidth,
+        nBinY = imgSpec.nBinY-1,
     )
     
     brName_nConsti = d_loadConfig["constiBranch"]
@@ -557,6 +558,7 @@ def main() :
         
         l_layerInfo.append(LayerInfo(
             layerIdx = iLayer,
+            imgSpec = imgSpec,
             **layer,
         ))
     
@@ -1138,7 +1140,8 @@ def main() :
                 
                 fig.tight_layout()
                 
-                fig.savefig("debug/jetImage_cat%d_layer%d_fromTensorFlowDataset%s.pdf" %(cat, iLayer, suffix))
+                os.system("mkdir -p debug/%s" %(out_tag))
+                fig.savefig("debug/%s/jetImage_cat%d_layer%d_fromTensorFlowDataset%s.pdf" %(out_tag, cat, iLayer, suffix))
                 
                 matplotlib.pyplot.close(fig)
     
