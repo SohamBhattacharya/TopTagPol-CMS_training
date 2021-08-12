@@ -151,3 +151,14 @@ def load_config(fileName) :
         
         return d_loadConfig
 
+
+
+def run_cmd_list(l_cmd) :
+    
+    for cmd in l_cmd :
+        
+        retval = os.system(cmd)
+        
+        if (retval) :
+            
+            exit()

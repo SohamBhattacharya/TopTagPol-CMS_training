@@ -4,6 +4,8 @@ import numpy
 import os
 import subprocess
 
+import utils
+
 
 cwd = os.getcwd()
 #cwd = "%s/src" %(subprocess.check_output(["echo", "$CMSSW_BASE"]).strip())
@@ -52,10 +54,12 @@ parser.add_argument(
 )
 
 
-if (__name__ == "__main__") :
+def main() :
     
     # Parse arguments
     args = parser.parse_args()
+    
+    l_cmd = []
     
     trainconfig_name = args.trainconfig.split("/")[-1]
     
@@ -73,15 +77,20 @@ if (__name__ == "__main__") :
     dirname = "%s" %(out_tag)
     
     condorDir = "%s/%s" %(args.condordir, dirname)
-    os.system("mkdir -p %s" %(condorDir))
+    l_cmd.append("mkdir -p %s" %(condorDir))
     
     trainconfig = "%s/%s" %(condorDir, trainconfig_name)
     condorconfig = "%s/%s" %(condorDir, condorconfig_name)
     condorscript = "%s/%s" %(condorDir, condorscript_name)
     
-    os.system("cp %s %s" %(args.trainconfig, trainconfig))
-    os.system("cp %s %s" %(args.condorconfig, condorconfig))
-    os.system("cp %s %s" %(args.condorscript, condorscript))
+    
+    l_cmd.extend([
+        "cp %s %s" %(args.trainconfig, trainconfig),
+        "cp %s %s" %(args.condorconfig, condorconfig),
+        "cp %s %s" %(args.condorscript, condorscript),
+        
+        "chmod +x %s" %(condorscript),
+    ])
     
     condor_log = "%s/job.log" %(condorDir)
     condor_out = "%s/job.out" %(condorDir)
@@ -104,16 +113,19 @@ if (__name__ == "__main__") :
             
             val = d[key]
             
-            cmd = "sed -i \"s#{find}#{repl}#g\" {filename}".format(
+            l_cmd.append("sed -i \"s#{find}#{repl}#g\" {filename}".format(
                 find = key,
                 repl = val,
                 filename = filename,
-            )
-            
-            os.system(cmd)
+            ))
+        
+        utils.run_cmd_list(l_cmd)
     
     format_file(condorconfig, d_format)
     format_file(condorscript, d_format)
+    
+    
+    utils.run_cmd_list(l_cmd)
     
     print("")
     print("Created directory: %s" %(condorDir))
@@ -128,4 +140,8 @@ if (__name__ == "__main__") :
     print("Script file:       %s" %(condorscript))
     
     print("")
+
+
+if (__name__ == "__main__") :
     
+    main()

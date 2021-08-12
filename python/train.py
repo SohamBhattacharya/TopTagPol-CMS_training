@@ -1207,8 +1207,9 @@ def main() :
             
             add_hist_trn = tensorflow.summary.histogram("output_trn", self.model.predict(dataset_trn).flatten())#, step = epoch)
             add_hist_tst = tensorflow.summary.histogram("output_tst", self.model.predict(dataset_tst).flatten())#, step = epoch)
-            print(add_hist_trn, add_hist_tst)
-            tensorflow.summary.scalar("epoch", data = epoch)#, step = epoch)
+            add_scalar = tensorflow.summary.scalar("epoch", data = epoch, step = epoch)
+            
+            print(add_hist_trn, add_hist_tst, add_scalar)
     
     
     print("=====> Starting fit... Memory:", getMemoryMB())
