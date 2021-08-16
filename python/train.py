@@ -1284,7 +1284,7 @@ def main() :
     
     history = model.fit(
         x = dataset_trn,
-        epochs = 20,
+        epochs = 30,
         #batch_size = batch_size,
         validation_data = dataset_tst,
         shuffle = False,
