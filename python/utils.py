@@ -60,7 +60,7 @@ def sparse_to_dense(tensor) :
     
     elif (isinstance(tensor, sparse.COO)) :
         
-        print("Converting to dense...")
+        #print("Converting to dense...")
         
         print(tensor.shape)
         

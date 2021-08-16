@@ -909,7 +909,9 @@ def main() :
         )
         
         arr_weight = numpy.repeat(
-            [1.0/d_catInfo[key].nJet for key in d_catInfo],
+            #[1.0/d_catInfo[key].nJet for key in d_catInfo],
+            [1.0 for key in d_catInfo],
+            
             [d_catInfo[key].nJet for key in d_catInfo],
         )
         
@@ -1005,19 +1007,19 @@ def main() :
         dataset_image = tensorflow.data.Dataset.from_tensor_slices(arr_inputdata)
         dataset_label = tensorflow.data.Dataset.from_tensor_slices(arr_label)
         dataset_weight = tensorflow.data.Dataset.from_tensor_slices(arr_weight)
-        #dataset = tensorflow.data.Dataset.zip((dataset_image, dataset_label, dataset_weight)).shuffle(buffer_size = nJetTot, reshuffle_each_iteration = False).batch(batch_size = batch_size, num_parallel_calls = tensorflow.data.AUTOTUNE).prefetch(tensorflow.data.AUTOTUNE)
-        dataset = tensorflow.data.Dataset.zip((dataset_image, dataset_label)).shuffle(buffer_size = nJetTot, reshuffle_each_iteration = False).batch(batch_size = batch_size, num_parallel_calls = tensorflow.data.AUTOTUNE).prefetch(tensorflow.data.AUTOTUNE)
+        dataset = tensorflow.data.Dataset.zip((dataset_image, dataset_label, dataset_weight)).shuffle(buffer_size = nJetTot, reshuffle_each_iteration = False).batch(batch_size = batch_size, num_parallel_calls = tensorflow.data.AUTOTUNE).prefetch(tensorflow.data.AUTOTUNE)
+        #dataset = tensorflow.data.Dataset.zip((dataset_image, dataset_label)).shuffle(buffer_size = nJetTot, reshuffle_each_iteration = False).batch(batch_size = batch_size, num_parallel_calls = tensorflow.data.AUTOTUNE).prefetch(tensorflow.data.AUTOTUNE)
         
         print("=====> Created dataset... Memory:", getMemoryMB())
         print(dataset.element_spec)
         
-        return dataset
+        return (dataset, dataset_image, dataset_label, dataset_weight)
     
     
     # Training data
     inpData_trn, arr_label_trn, arr_weight_trn = read_data(d_catInfo = d_catInfo_trn)
     
-    dataset_trn = get_dataset(
+    dataset_trn, dataset_image_trn, dataset_label_trn, dataset_weight_trn = get_dataset(
         inpData = inpData_trn,
         arr_label = arr_label_trn,
         arr_weight = arr_weight_trn,
@@ -1036,7 +1038,7 @@ def main() :
     
     inpData_tst, arr_label_tst, arr_weight_tst = read_data(d_catInfo = d_catInfo_tst)
     
-    dataset_tst = get_dataset(
+    dataset_tst, dataset_image_tst, dataset_label_tst, dataset_weight_tst = get_dataset(
         inpData = inpData_tst,
         arr_label = arr_label_tst,
         arr_weight = arr_weight_tst,
@@ -1152,8 +1154,27 @@ def main() :
     
     ##exit()
     
+    l_auc = []
     
-    model = networks.d_network["CNN1"](input_shape = img_shape, nCategory = nCategory)
+    #for cat in range(0, nCategory) :
+    #    
+    #    label_weights = [0]*nCategory
+    #    label_weights[cat] = 1
+    #    
+    #    l_auc.append(tensorflow.keras.metrics.AUC(
+    #        name = "auc%d" %(cat)
+    #        num_thresholds = 200,
+    #        curve = "ROC",
+    #        multi_label = True,
+    #        num_labels = nCategory,
+    #        label_weights = label_weights,
+    #        from_logits = False,
+    #    ))
+    
+    
+    network_name = d_loadConfig["network"]
+    
+    model = networks.d_network[network_name](input_shape = img_shape, nCategory = nCategory)
     model.summary()
     
     print("=====> Compiling model... Memory:", getMemoryMB())
@@ -1162,11 +1183,65 @@ def main() :
         optimizer = "adam",
         #loss = tensorflow.keras.losses.SparseCategoricalCrossentropy(from_logits = True),
         loss = tensorflow.keras.losses.SparseCategoricalCrossentropy(from_logits = False), # no need to turn on from_logits if the network output is already a probability distribution like softmax
-        metrics = ["accuracy"],
+        metrics = ["accuracy"].extend(l_auc),
         run_eagerly = True,
     )
     
     print("=====> Compiled model... Memory:", getMemoryMB())
+    
+    
+    class CustomCallback(tensorflow.keras.callbacks.Callback):
+        
+        def __init__(self) :
+            
+            print("Initialized instance of CustomCallback.")
+            
+            self.d_dataset_trn = {}
+            self.d_dataset_tst = {}
+            
+            for cat in d_catInfo_trn.keys() :
+                
+                self.d_dataset_trn[cat] = tensorflow.data.Dataset.zip(
+                    (dataset_image_trn, dataset_label_trn, dataset_weight_trn)
+                ).filter(lambda x, y, w: self.is_from_cat(x, y, cat)).batch(
+                    batch_size = batch_size,
+                    num_parallel_calls = tensorflow.data.AUTOTUNE
+                ).prefetch(tensorflow.data.AUTOTUNE)
+                
+                self.d_dataset_tst[cat] = tensorflow.data.Dataset.zip(
+                    (dataset_image_tst, dataset_label_tst, dataset_weight_tst)
+                ).filter(lambda x, y, w: self.is_from_cat(x, y, cat)).batch(
+                    batch_size = batch_size,
+                    num_parallel_calls = tensorflow.data.AUTOTUNE
+                ).prefetch(tensorflow.data.AUTOTUNE)
+        
+        
+        def is_from_cat(self, x, y, catNum) :
+            
+            #print(catNum, x, y, tensorflow.math.equal(y, catNum))
+            print(catNum, x, y, tensorflow.math.equal(y, catNum))
+            #print(catNum, x)
+            
+            #return True
+            return tensorflow.math.equal(y, catNum)
+        
+        def on_epoch_end(self, epoch, logs=None):
+            
+            keys = list(logs.keys())
+            
+            for cat in d_catInfo_trn.keys() :
+                
+                pred_trn = self.model.predict(self.d_dataset_trn[cat])
+                pred_tst = self.model.predict(self.d_dataset_tst[cat])
+                
+                #print("Trn %s:" %(str(cat)), pred_trn.shape)
+                #print("Tst %s:" %(str(cat)), pred_tst.shape)
+                
+                for node in range(nCategory) :
+                    
+                    tensorflow.summary.histogram("output_node%d_cat%d_trn" %(node, cat), pred_trn[:, node], step = epoch, buckets = 100)
+                    tensorflow.summary.histogram("output_node%d_cat%d_tst" %(node, cat), pred_tst[:, node], step = epoch, buckets = 100)
+    
     
     
     checkpoint_file = "%s/weights_{epoch:d}.hdf5" %(checkpoint_dir)
@@ -1184,6 +1259,11 @@ def main() :
     )
     
     
+    tensorboard_file_writer = tensorflow.summary.create_file_writer("%s/metrics" %(tensorboard_dir))
+    tensorboard_file_writer.set_as_default()
+    
+    my_callback = CustomCallback()
+    
     tensorboard_callback = tensorflow.keras.callbacks.TensorBoard(
         log_dir = tensorboard_dir,
         histogram_freq = 1,
@@ -1198,18 +1278,6 @@ def main() :
     )
     
     
-    class CustomCallback(tensorflow.keras.callbacks.Callback):
-        
-        def on_epoch_end(self, epoch, logs=None):
-            
-            keys = list(logs.keys())
-            print("End epoch {} of training; got log keys: {}".format(epoch, keys))
-            
-            add_hist_trn = tensorflow.summary.histogram("output_trn", self.model.predict(dataset_trn).flatten())#, step = epoch)
-            add_hist_tst = tensorflow.summary.histogram("output_tst", self.model.predict(dataset_tst).flatten())#, step = epoch)
-            add_scalar = tensorflow.summary.scalar("epoch", data = epoch, step = epoch)
-            
-            print(add_hist_trn, add_hist_tst, add_scalar)
     
     
     print("=====> Starting fit... Memory:", getMemoryMB())
@@ -1223,7 +1291,7 @@ def main() :
         #max_queue_size = 20,
         #use_multiprocessing = True,
         #workers = nCpu_use,
-        callbacks = [checkpoint_callback, tensorboard_callback, CustomCallback()]
+        callbacks = [checkpoint_callback, tensorboard_callback, my_callback]
     )
 
 
