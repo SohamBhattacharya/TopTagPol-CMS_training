@@ -213,7 +213,6 @@ dependencies:
     - gviz-api==1.9.0
     - h5py==3.1.0
     - idna==2.10
-    - image-classifiers==1.0.0
     - joblib==1.0.1
     - keras-applications==1.0.8
     - keras-nightly==2.5.0.dev2021032900
