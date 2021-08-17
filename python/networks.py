@@ -1,5 +1,7 @@
+import keras
 import tensorflow
 
+from classification_models.tfkeras import Classifiers
 from tensorflow.keras import datasets, layers, models
 from tensorflow.keras import mixed_precision
 
@@ -54,3 +56,72 @@ def build_and_get_CNN2(input_shape, nCategory) :
     return model
 
 d_network["CNN2"] = build_and_get_CNN2
+
+
+def build_and_get_ResNet50(input_shape, nCategory) :
+    
+    resnet50, preproc = Classifiers.get("resnet50")
+    
+    network_input = layers.Input(shape = input_shape)
+    layer_spd = layers.Lambda(function = utils.sparse_to_dense, input_shape = input_shape)(network_input)
+    
+    base_model = resnet50(
+        input_shape = input_shape,
+        input_tensor = layer_spd,
+        include_top = False,
+        classes = nCategory
+    )
+    
+    x = layers.GlobalAveragePooling2D()(base_model.output)
+    
+    x = layers.Dropout(rate = 0.5)(x)
+    x = layers.Dense(nCategory, activation = "relu")(x)
+    
+    network_output = layers.Dense(nCategory, activation = tensorflow.keras.activations.softmax)(x)
+    
+    model = models.Model(inputs = base_model.input, outputs = network_output)
+    
+    return model
+
+d_network["ResNet50"] = build_and_get_ResNet50
+
+
+def build_and_get_ResNeXt50(input_shape, nCategory) :
+    
+    resnext50, preproc = Classifiers.get("resnext50")
+    
+    network_input = layers.Input(shape = input_shape)#, sparse = True)
+    layer_spd = layers.Lambda(function = utils.sparse_to_dense, input_shape = input_shape)(network_input)
+    
+    #network_input = layers.Input(shape = input_shape, sparse = True)(layer_spd)
+    
+    #layer_spd = layers.Lambda(function = utils.sparse_to_dense, input_shape = input_shape)
+    #network_input = keras.Input(tensor = layer_spd)#, sparse = True)
+    
+    base_model = resnext50(
+        input_shape = input_shape,
+        #input_tensor = None,
+        #input_tensor = network_input,
+        input_tensor = layer_spd,
+        include_top = False,
+        classes = nCategory
+    )
+    
+    #return base_model
+    
+    x = layers.GlobalAveragePooling2D()(base_model.output)
+    
+    x = layers.Dropout(rate = 0.5)(x)
+    x = layers.Dense(nCategory, activation = "relu")(x)
+    
+    network_output = layers.Dense(nCategory, activation = tensorflow.keras.activations.softmax)(x)
+    
+    #model = models.Model(inputs = [base_model.input], outputs = [network_output])
+    #model = models.Model(inputs = [base_model.input], outputs = [network_output])
+    
+    model = models.Model(inputs = base_model.input, outputs = network_output)
+    
+    
+    return model
+
+d_network["ResNeXt50"] = build_and_get_ResNeXt50

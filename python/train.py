@@ -12,6 +12,7 @@ import collections
 import concurrent.futures
 import datetime
 import gc
+import keras
 import matplotlib
 import matplotlib.colors
 import matplotlib.pyplot
@@ -24,6 +25,8 @@ import os
 import PIL
 import psutil
 import pympler
+import sklearn
+import sklearn.metrics
 import sortedcontainers
 import sparse
 import sys
@@ -479,9 +482,16 @@ def main() :
     
     parser.add_argument(
         "--tag",
-        help = "Tag (will create the training directory <tag>. If omitted, will use <datetime>.)",
+        help = "Tag (will create the training directory <tag>). If omitted, will use <datetime>.",
         type = str,
         required = False,
+    )
+    
+    parser.add_argument(
+        "--usedatetime",
+        help = "If \"tag\" is provided, <datetime> will not be appended by default. Pass this flag to force adding <datetime>.",
+        default = False,
+        action = "store_true",
     )
     
     parser.add_argument(
@@ -497,11 +507,23 @@ def main() :
     d_args = vars(args)
     
     
-    out_tag = args.tag
+    out_tag = args.tag.strip()
     
-    if (out_tag is None or not len(out_tag.strip())) :
+    if (out_tag is None) :
         
-        out_tag = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        out_tag = ""
+    
+    if (not len(out_tag.strip())) :
+        
+        args.usedatetime = True
+    
+    datetime_tag = ""
+    
+    if (args.usedatetime) :
+        
+        datetime_tag = "%s" %(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+    
+    out_tag = "%s%s%s" %(out_tag, "_"*int(len(out_tag) > 0), datetime_tag)
     
     checkpoint_dir = "%s/model_checkpoints/%s" %(args.outdirbase, out_tag)
     tensorboard_dir = "%s/tensorboard/%s" %(args.outdirbase, out_tag)
@@ -1154,36 +1176,75 @@ def main() :
     
     ##exit()
     
-    l_auc = []
-    
-    #for cat in range(0, nCategory) :
-    #    
-    #    label_weights = [0]*nCategory
-    #    label_weights[cat] = 1
-    #    
-    #    l_auc.append(tensorflow.keras.metrics.AUC(
-    #        name = "auc%d" %(cat)
-    #        num_thresholds = 200,
-    #        curve = "ROC",
-    #        multi_label = True,
-    #        num_labels = nCategory,
-    #        label_weights = label_weights,
-    #        from_logits = False,
-    #    ))
-    
-    
     network_name = d_loadConfig["network"]
+    nEpoch = d_loadConfig["nEpoch"]
     
     model = networks.d_network[network_name](input_shape = img_shape, nCategory = nCategory)
     model.summary()
     
     print("=====> Compiling model... Memory:", getMemoryMB())
     
+    
+    #class MyLRSchedule(tensorflow.keras.optimizers.schedules.LearningRateSchedule) :
+    #    
+    #    def __init__(
+    #        self,
+    #        initial_learning_rate,
+    #        loss_decrease_threshold,
+    #        decay_rate,
+    #    ) :
+    #        
+    #        self.initial_learning_rate = initial_learning_rate
+    #        self.loss_decrease_threshold = loss_decrease_threshold
+    #        self.decay_rate = decay_rate
+    #    
+    #    def __call__(self, step) :
+    #        
+    #        lr = self.initial_learning_rate / (step + 1)
+    #        print("Learning rate (step %d) %0.4g" %(step+1, lr))
+    #        
+    #        return lr
+    #    
+    #    def get_config(self):
+    #        
+    #        return vars(self)
+    #    
+    #
+    
+    lr_boundaries = [ele * nBatch_trn for ele in d_loadConfig["learningRate"]["epoch"]]
+    lr_values = d_loadConfig["learningRate"]["rate"]
+    
+    lr_schedule = tensorflow.keras.optimizers.schedules.PiecewiseConstantDecay(
+        boundaries = lr_boundaries,
+        values = lr_values,
+    )
+    
+    print(lr_schedule)
+    
+    optimizer = tensorflow.keras.optimizers.Adam(
+        learning_rate = lr_schedule,
+    )
+    
+    
+    #lr_max = d_loadConfig["learningRate"][0]
+    #lr_min = d_loadConfig["learningRate"][1]
+    #lr_nStep = d_loadConfig["learningRate"][2]
+    
+    
+    tensorboard_file_writer_trn = tensorflow.summary.create_file_writer("%s/train" %(tensorboard_dir))
+    tensorboard_file_writer_tst = tensorflow.summary.create_file_writer("%s/validation" %(tensorboard_dir))
+    tensorboard_file_writer_params = tensorflow.summary.create_file_writer("%s/params" %(tensorboard_dir))
+    #tensorboard_file_writer.set_as_default()
+    
+    
     model.compile(
-        optimizer = "adam",
+        #optimizer = "adam",
+        optimizer = optimizer,
+        
         #loss = tensorflow.keras.losses.SparseCategoricalCrossentropy(from_logits = True),
         loss = tensorflow.keras.losses.SparseCategoricalCrossentropy(from_logits = False), # no need to turn on from_logits if the network output is already a probability distribution like softmax
-        metrics = ["accuracy"].extend(l_auc),
+        
+        metrics = ["accuracy"],
         run_eagerly = True,
     )
     
@@ -1203,17 +1264,25 @@ def main() :
                 
                 self.d_dataset_trn[cat] = tensorflow.data.Dataset.zip(
                     (dataset_image_trn, dataset_label_trn, dataset_weight_trn)
-                ).filter(lambda x, y, w: self.is_from_cat(x, y, cat)).batch(
+                ).filter(
+                    lambda x, y, w: self.is_from_cat(x, y, cat)
+                ).batch(
                     batch_size = batch_size,
                     num_parallel_calls = tensorflow.data.AUTOTUNE
                 ).prefetch(tensorflow.data.AUTOTUNE)
                 
                 self.d_dataset_tst[cat] = tensorflow.data.Dataset.zip(
                     (dataset_image_tst, dataset_label_tst, dataset_weight_tst)
-                ).filter(lambda x, y, w: self.is_from_cat(x, y, cat)).batch(
+                ).filter(
+                    lambda x, y, w: self.is_from_cat(x, y, cat)
+                ).batch(
                     batch_size = batch_size,
                     num_parallel_calls = tensorflow.data.AUTOTUNE
                 ).prefetch(tensorflow.data.AUTOTUNE)
+            
+            
+            self.prev_epoch = 0
+            self.prev_step = 0
         
         
         def is_from_cat(self, x, y, catNum) :
@@ -1225,22 +1294,112 @@ def main() :
             #return True
             return tensorflow.math.equal(y, catNum)
         
-        def on_epoch_end(self, epoch, logs=None):
+        
+        def on_train_batch_end(self, batch, logs = None) :
+            
+            self.prev_step = nBatch_trn * self.prev_epoch + batch
+            
+            #print("%"*10, self.prev_step)
+            #print(self.model.predict(self.d_dataset_trn[0]))
+        
+        
+        def on_epoch_end(self, epoch, logs = None):
+            
+            self.prev_epoch = epoch
+            
+            with tensorboard_file_writer_params.as_default() :
+                
+                #tensorflow.summary.scalar("learning_rate", self.model.optimizer.learning_rate, step = epoch)
+                tensorflow.summary.scalar("learning_rate", self.model.optimizer.learning_rate(self.prev_step), step = epoch)
             
             keys = list(logs.keys())
+            
+            d_pred_trn = {}
+            d_pred_tst = {}
             
             for cat in d_catInfo_trn.keys() :
                 
                 pred_trn = self.model.predict(self.d_dataset_trn[cat])
                 pred_tst = self.model.predict(self.d_dataset_tst[cat])
                 
+                d_pred_trn[cat] = pred_trn
+                d_pred_tst[cat] = pred_tst
+                
                 #print("Trn %s:" %(str(cat)), pred_trn.shape)
                 #print("Tst %s:" %(str(cat)), pred_tst.shape)
                 
+                #print(self.model.input)
+                #print(self.model.output)
+                #print("*"*10, cat)
+                #print(pred_trn)
+                
                 for node in range(nCategory) :
                     
-                    tensorflow.summary.histogram("output_node%d_cat%d_trn" %(node, cat), pred_trn[:, node], step = epoch, buckets = 100)
-                    tensorflow.summary.histogram("output_node%d_cat%d_tst" %(node, cat), pred_tst[:, node], step = epoch, buckets = 100)
+                    with tensorboard_file_writer_trn.as_default() :
+                        
+                        tensorflow.summary.histogram("output_node%d_cat%d" %(node, cat), pred_trn[:, node], step = epoch, buckets = 100)
+                    
+                    with tensorboard_file_writer_tst.as_default() :
+                        
+                        tensorflow.summary.histogram("output_node%d_cat%d" %(node, cat), pred_tst[:, node], step = epoch, buckets = 100)
+            
+            
+            for node in range(nCategory) :
+                
+                cat_sig = list(d_catInfo_trn.keys())[node]
+                
+                for iCat, cat_bkg in enumerate(list(d_catInfo_trn.keys())) :
+                    
+                    if (cat_sig == cat_bkg) :
+                        
+                        continue
+                    
+                    
+                    # Train
+                    arr_eff_bkg_trn, arr_eff_sig_trn, arr_threshold_trn = sklearn.metrics.roc_curve(
+                        y_true = numpy.repeat(
+                            [cat_sig, cat_bkg],
+                            [len(d_pred_trn[cat_sig]), len(d_pred_trn[cat_bkg])],
+                        ),
+                        y_score = numpy.concatenate(
+                            [
+                                d_pred_trn[cat_sig][:, node],
+                                d_pred_trn[cat_bkg][:, node],
+                            ],
+                            axis = None,
+                        ),
+                        pos_label = cat_sig,
+                    )
+                    
+                    auc_trn = sklearn.metrics.auc(arr_eff_bkg_trn, arr_eff_sig_trn)
+                    
+                    
+                    # Test
+                    arr_eff_bkg_tst, arr_eff_sig_tst, arr_threshold_tst = sklearn.metrics.roc_curve(
+                        y_true = numpy.repeat(
+                            [cat_sig, cat_bkg],
+                            [len(d_pred_tst[cat_sig]), len(d_pred_tst[cat_bkg])],
+                        ),
+                        y_score = numpy.concatenate(
+                            [
+                                d_pred_tst[cat_sig][:, node],
+                                d_pred_tst[cat_bkg][:, node],
+                            ],
+                            axis = None,
+                        ),
+                        pos_label = cat_sig,
+                    )
+                    
+                    auc_tst = sklearn.metrics.auc(arr_eff_bkg_tst, arr_eff_sig_tst)
+                    
+                    
+                    with tensorboard_file_writer_trn.as_default() :
+                        
+                        tensorflow.summary.scalar("auc_cat%d_vs_cat%d" %(cat_sig, cat_bkg), auc_trn, step = epoch)
+                    
+                    with tensorboard_file_writer_tst.as_default() :
+                        
+                        tensorflow.summary.scalar("auc_cat%d_vs_cat%d" %(cat_sig, cat_bkg), auc_tst, step = epoch)
     
     
     
@@ -1258,9 +1417,6 @@ def main() :
         #**kwargs
     )
     
-    
-    tensorboard_file_writer = tensorflow.summary.create_file_writer("%s/metrics" %(tensorboard_dir))
-    tensorboard_file_writer.set_as_default()
     
     my_callback = CustomCallback()
     
@@ -1284,7 +1440,7 @@ def main() :
     
     history = model.fit(
         x = dataset_trn,
-        epochs = 30,
+        epochs = nEpoch,
         #batch_size = batch_size,
         validation_data = dataset_tst,
         shuffle = False,

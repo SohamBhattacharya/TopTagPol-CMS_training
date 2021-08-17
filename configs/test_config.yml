@@ -96,8 +96,15 @@ layers:
       resolverUpdate: "max({newResolver}, {oldResolver})"
       resolverBranch: "[jet]_consti_pT_reco"
 jetName : "[jet]:jet_selectedPatJetsAK15PFPuppi_boost_2_1_sd_0p1_0_1"
-network: CNN2
-testFraction: 0.2
-batchSize: 1000
 loadEventPerJob: 500
 cpuFrac: 0.99
+network: CNN1
+testFraction: 0.2
+batchSize: 1000
+nEpoch: 100
+learningRate:
+    epoch:
+        - 50
+    rate:
+        - 0.001
+        - 0.0001
