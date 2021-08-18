@@ -23,6 +23,7 @@ import multiprocessing.shared_memory
 import numpy
 import os
 import PIL
+#import pprint
 import psutil
 import pympler
 import sklearn
@@ -30,6 +31,7 @@ import sklearn.metrics
 import sortedcontainers
 import sparse
 import sys
+import tabulate
 import tensorflow
 import time
 import uproot
@@ -160,12 +162,15 @@ class CategoryInfo :
     def __init__(
         self,
         catNum,
+        catName,
         samples,
         l_layerInfo,
         cut,
     ) :
         
         self.catNum = catNum
+        self.catName = catName
+        self.l_sample = samples
         self.l_layerInfo = l_layerInfo
         self.cut = cut
         
@@ -599,6 +604,7 @@ def main() :
         
         d_catInfo_trn[catNum] = CategoryInfo(
             catNum = catNum,
+            catName = category["name"],
             samples = category["samples"],
             l_layerInfo = l_layerInfo,
             cut = category["cut"],
@@ -606,6 +612,7 @@ def main() :
         
         d_catInfo_tst[catNum] = CategoryInfo(
             catNum = catNum,
+            catName = category["name"],
             samples = category["samples"],
             l_layerInfo = l_layerInfo,
             cut = category["cut"],
@@ -1082,7 +1089,7 @@ def main() :
             
             print(
                 "Category %d: nJet %d %s" %(
-                iCat,
+                cat,
                 catInfo.nJet,
                 str(catInfo.l_sample_nJet),
             ))
@@ -1182,8 +1189,6 @@ def main() :
     model = networks.d_network[network_name](input_shape = img_shape, nCategory = nCategory)
     model.summary()
     
-    print("=====> Compiling model... Memory:", getMemoryMB())
-    
     
     #class MyLRSchedule(tensorflow.keras.optimizers.schedules.LearningRateSchedule) :
     #    
@@ -1226,16 +1231,81 @@ def main() :
     )
     
     
-    #lr_max = d_loadConfig["learningRate"][0]
-    #lr_min = d_loadConfig["learningRate"][1]
-    #lr_nStep = d_loadConfig["learningRate"][2]
-    
-    
     tensorboard_file_writer_trn = tensorflow.summary.create_file_writer("%s/train" %(tensorboard_dir))
     tensorboard_file_writer_tst = tensorflow.summary.create_file_writer("%s/validation" %(tensorboard_dir))
     tensorboard_file_writer_params = tensorflow.summary.create_file_writer("%s/params" %(tensorboard_dir))
+    tensorboard_file_writer_config = tensorflow.summary.create_file_writer("%s/config" %(tensorboard_dir))
     #tensorboard_file_writer.set_as_default()
     
+    
+    with tensorboard_file_writer_config.as_default() :
+        
+        tensorflow.summary.text(
+            "configuration",
+            "```\n%s\n```" %(d_loadConfig["fileContent"]),
+            step = 0,
+        )
+    
+    
+    def get_sample_table_str(d_catInfo) :
+        
+        l_table = []
+        
+        l_table.append([
+            "Category",
+            "Sample",
+            "Jets",
+        ])
+        
+        for (iCat, cat) in enumerate(d_catInfo.keys()) :
+            
+            catInfo = d_catInfo[cat]
+            
+            for iSample, sample in enumerate(catInfo.l_sample) :
+                
+                l_table.append([
+                    "%d (%s)" %(catInfo.catNum, catInfo.catName) if (not iSample) else "",
+                    sample,
+                    catInfo.l_sample_nJet[iSample],
+                ])
+            
+            l_table.append([
+                "**%s**" %(l_table[-1][0]),
+                "**Total**",
+                "**%d**" %(sum(catInfo.l_sample_nJet)),
+            ])
+        
+        
+        table_str = tabulate.tabulate(
+            l_table,
+            headers = "firstrow",
+            #tablefmt = "fancy_grid"
+            tablefmt = "github"
+        )
+        
+        print(table_str)
+        
+        return table_str
+    
+    
+    with tensorboard_file_writer_trn.as_default() :
+        
+        tensorflow.summary.text(
+            "samples",
+            get_sample_table_str(d_catInfo_trn),
+            step = 0,
+        )
+    
+    with tensorboard_file_writer_tst.as_default() :
+        
+        tensorflow.summary.text(
+            "samples",
+            get_sample_table_str(d_catInfo_tst),
+            step = 0,
+        )
+    
+    
+    print("=====> Compiling model... Memory:", getMemoryMB())
     
     model.compile(
         #optimizer = "adam",

@@ -149,6 +149,8 @@ def load_config(fileName) :
         
         d_loadConfig = yaml.load(fileContent, Loader = yaml.FullLoader)
         
+        d_loadConfig["fileContent"] = fileContent
+        
         return d_loadConfig
 
 

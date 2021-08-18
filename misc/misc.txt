@@ -1,4 +1,4 @@
-rsync -asP --no-perms --no-owner --no-group --exclude "*.root" --exclude "*__init__*" --exclude "*.svn*" --exclude "*fuse*" --exclude "weights/*" --exclude "temp/*" --exclude "*cmsShow*" --exclude "plots/*" --exclude "documentation/*" --exclude "*sourceFiles*" --exclude "*.pdf" --exclude "*.png" --exclude "*.log" --exclude "*.pyc" --exclude "*_cc.*" --exclude "*.pcm" ./* sobhatta@naf-cms.desy.de:/nfs/dust/cms/user/sobhatta/work/TopTagPol/Training/
+rsync -asP --no-perms --no-owner --no-group --exclude "*.root" --exclude "*.svn*" --exclude "*fuse*" --exclude "weights/*" --exclude "temp/*" --exclude "*cmsShow*" --exclude "plots/*" --exclude "documentation/*" --exclude "*sourceFiles*" --exclude "*.pdf" --exclude "*.png" --exclude "*.log" --exclude "*.pyc" --exclude "*_cc.*" --exclude "*.pcm" ./* sobhatta@naf-cms.desy.de:/nfs/dust/cms/user/sobhatta/work/TopTagPol/Training/
 
 tensorboard --logdir training_results/tensorboard/
 tensorboard --logdir `find training_results/tensorboard/ -maxdepth 1 | sort -V | tail -n 1`
