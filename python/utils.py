@@ -1,4 +1,5 @@
 import argparse
+import io
 import matplotlib
 import matplotlib.colors
 import matplotlib.pyplot
@@ -40,6 +41,7 @@ class ColorPalette :
         ROOT.TColor.CreateGradientColorTable(self.nStop, self.a_stop, self.a_r, self.a_g, self.a_b, nContour)
 
 
+#@tensorflow.function
 def sparse_to_dense(tensor) :
     
     #print(tensor)
@@ -154,7 +156,6 @@ def load_config(fileName) :
         return d_loadConfig
 
 
-
 def run_cmd_list(l_cmd) :
     
     for cmd in l_cmd :
@@ -164,3 +165,49 @@ def run_cmd_list(l_cmd) :
         if (retval) :
             
             exit()
+
+
+def get_tfimage_roc(
+    x,
+    y,
+    style,
+    xlabel = "",
+    ylabel = "",
+) : 
+    
+    fig = matplotlib.pyplot.figure(figsize = [4, 4])
+    axis = fig.add_subplot(1, 1, 1)
+    
+    #axis.set_aspect("equal", "box")
+    
+    axis.plot(x, y, style) 
+    
+    axis.set_xlim((0, 1))
+    axis.set_ylim((1e-6, 1))
+    
+    axis.set_xlabel(xlabel)
+    axis.set_ylabel(ylabel)
+    
+    axis.set_yscale("log")
+    axis.grid(True)
+    
+    fig.tight_layout()
+    
+    buf = io.BytesIO()
+    matplotlib.pyplot.savefig(buf, format = "png")
+    
+    # Closing the figure prevents it from being displayed directly inside the notebook.
+    matplotlib.pyplot.close(fig)
+    
+    buf.seek(0)
+    
+    # Convert PNG buffer to TF image
+    tfimage = tensorflow.image.decode_png(buf.getvalue(), channels = 4)
+    
+    # Add the batch dimension
+    tfimage = tensorflow.expand_dims(tfimage, 0)
+    
+    buf.close()
+    
+    return tfimage
+

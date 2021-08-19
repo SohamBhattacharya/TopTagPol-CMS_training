@@ -374,16 +374,18 @@ def computeBins(
                 a_y  = branches[yVarName][iEvent][iJet].to_numpy().astype(dtype = numpy.uint32)
                 a_w  = branches[wVarName][iEvent][iJet].to_numpy()#.astype(dtype = numpy.float16)
                 
-                #a_x  = awkward.values_astype(branches[xVarName][iEvent][iJet], to = numpy.uint32)
-                #a_y  = awkward.values_astype(branches[yVarName][iEvent][iJet], to = numpy.uint32)
-                #a_w  = branches[wVarName][iEvent][iJet].to_numpy().astype(dtype = numpy.float16)
+                
+                # Do NOT use these: the values are not cast properly
+                ###a_x  = awkward.values_astype(branches[xVarName][iEvent][iJet], to = numpy.uint32)
+                ###a_y  = awkward.values_astype(branches[yVarName][iEvent][iJet], to = numpy.uint32)
+                ###a_w  = branches[wVarName][iEvent][iJet].to_numpy().astype(dtype = numpy.float16)
                 
                 a_constiCut = None
                 
                 if (layerInfo.cutBranch is not None) :
                     
                     a_constiCut = branches[constiCutVarName][iEvent][iJet].to_numpy().astype(dtype = numpy.uint32)
-                    #a_constiCut = awkward.values_astype(branches[constiCutVarName][iEvent][iJet], to = numpy.uint32)
+                    ###a_constiCut = awkward.values_astype(branches[constiCutVarName][iEvent][iJet], to = numpy.uint32)
                 
                 else :
                     
@@ -1037,7 +1039,6 @@ def main() :
         dataset_label = tensorflow.data.Dataset.from_tensor_slices(arr_label)
         dataset_weight = tensorflow.data.Dataset.from_tensor_slices(arr_weight)
         dataset = tensorflow.data.Dataset.zip((dataset_image, dataset_label, dataset_weight)).shuffle(buffer_size = nJetTot, reshuffle_each_iteration = False).batch(batch_size = batch_size, num_parallel_calls = tensorflow.data.AUTOTUNE).prefetch(tensorflow.data.AUTOTUNE)
-        #dataset = tensorflow.data.Dataset.zip((dataset_image, dataset_label)).shuffle(buffer_size = nJetTot, reshuffle_each_iteration = False).batch(batch_size = batch_size, num_parallel_calls = tensorflow.data.AUTOTUNE).prefetch(tensorflow.data.AUTOTUNE)
         
         print("=====> Created dataset... Memory:", getMemoryMB())
         print(dataset.element_spec)
@@ -1312,10 +1313,12 @@ def main() :
         optimizer = optimizer,
         
         #loss = tensorflow.keras.losses.SparseCategoricalCrossentropy(from_logits = True),
-        loss = tensorflow.keras.losses.SparseCategoricalCrossentropy(from_logits = False), # no need to turn on from_logits if the network output is already a probability distribution like softmax
+        
+        # no need to turn on from_logits if the network output is already a probability distribution like softmax
+        loss = tensorflow.keras.losses.SparseCategoricalCrossentropy(from_logits = False),
         
         metrics = ["accuracy"],
-        run_eagerly = True,
+        #run_eagerly = True,
     )
     
     print("=====> Compiled model... Memory:", getMemoryMB())
@@ -1324,8 +1327,6 @@ def main() :
     class CustomCallback(tensorflow.keras.callbacks.Callback):
         
         def __init__(self) :
-            
-            print("Initialized instance of CustomCallback.")
             
             self.d_dataset_trn = {}
             self.d_dataset_tst = {}
@@ -1353,11 +1354,12 @@ def main() :
             
             self.prev_epoch = 0
             self.prev_step = 0
+            
+            print("Initialized instance of CustomCallback.")
         
         
         def is_from_cat(self, x, y, catNum) :
             
-            #print(catNum, x, y, tensorflow.math.equal(y, catNum))
             print(catNum, x, y, tensorflow.math.equal(y, catNum))
             #print(catNum, x)
             
@@ -1466,10 +1468,28 @@ def main() :
                     with tensorboard_file_writer_trn.as_default() :
                         
                         tensorflow.summary.scalar("auc_cat%d_vs_cat%d" %(cat_sig, cat_bkg), auc_trn, step = epoch)
+                        
+                        tfimage = utils.get_tfimage_roc(
+                            x = arr_eff_sig_trn,
+                            y = arr_eff_bkg_trn,
+                            style = "-",
+                            xlabel = "cat%d efficiency" %(cat_sig),
+                            ylabel = "cat%d efficiency" %(cat_bkg),
+                        )
+                        tensorflow.summary.image("roc_cat%d_vs_cat%d" %(cat_sig, cat_bkg), tfimage, step = epoch)
                     
                     with tensorboard_file_writer_tst.as_default() :
                         
                         tensorflow.summary.scalar("auc_cat%d_vs_cat%d" %(cat_sig, cat_bkg), auc_tst, step = epoch)
+                        
+                        tfimage = utils.get_tfimage_roc(
+                            x = arr_eff_sig_trn,
+                            y = arr_eff_bkg_trn,
+                            style = "-",
+                            xlabel = "cat%d efficiency" %(cat_sig),
+                            ylabel = "cat%d efficiency" %(cat_bkg),
+                        )
+                        tensorflow.summary.image("roc_cat%d_vs_cat%d" %(cat_sig, cat_bkg), tfimage, step = epoch)
     
     
     
