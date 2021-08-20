@@ -101,6 +101,7 @@ cpuFrac: 0.99
 network: CNN1
 testFraction: 0.2
 batchSize: 1000
+batchLog: 10
 nEpoch: 100
 learningRate:
     epoch:

@@ -100,7 +100,8 @@ loadEventPerJob: 20000
 cpuFrac: 0.99
 network: ResNeXt50
 testFraction: 0.2
-batchSize: 1000
+batchSize: 2000
+batchLog: 100
 nEpoch: 100
 learningRate:
     epoch:

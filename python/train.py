@@ -514,11 +514,7 @@ def main() :
     d_args = vars(args)
     
     
-    out_tag = args.tag.strip()
-    
-    if (out_tag is None) :
-        
-        out_tag = ""
+    out_tag = "" if (args.tag is None) else args.tag.strip()
     
     if (not len(out_tag.strip())) :
         
@@ -530,7 +526,7 @@ def main() :
         
         datetime_tag = "%s" %(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
     
-    out_tag = "%s%s%s" %(out_tag, "_"*int(len(out_tag) > 0), datetime_tag)
+    out_tag = "%s%s%s" %(out_tag, "_"*int(len(out_tag+datetime_tag) > 0), datetime_tag)
     
     checkpoint_dir = "%s/model_checkpoints/%s" %(args.outdirbase, out_tag)
     tensorboard_dir = "%s/tensorboard/%s" %(args.outdirbase, out_tag)
@@ -1262,16 +1258,18 @@ def main() :
             
             catInfo = d_catInfo[cat]
             
+            rowLabel = "%d (%s)" %(catInfo.catNum, catInfo.catName)
+            
             for iSample, sample in enumerate(catInfo.l_sample) :
                 
                 l_table.append([
-                    "%d (%s)" %(catInfo.catNum, catInfo.catName) if (not iSample) else "",
+                    rowLabel if (not iSample) else "",
                     sample,
                     catInfo.l_sample_nJet[iSample],
                 ])
             
             l_table.append([
-                "**%s**" %(l_table[-1][0]),
+                "**%s**" %(rowLabel),
                 "**Total**",
                 "**%d**" %(sum(catInfo.l_sample_nJet)),
             ])
@@ -1306,16 +1304,19 @@ def main() :
         )
     
     
+    # Loss definition
+    # no need to turn on from_logits if the network output is already a probability distribution like softmax
+    loss_fn = tensorflow.keras.losses.SparseCategoricalCrossentropy(
+        from_logits = False
+    )
+    
     print("=====> Compiling model... Memory:", getMemoryMB())
     
     model.compile(
         #optimizer = "adam",
         optimizer = optimizer,
         
-        #loss = tensorflow.keras.losses.SparseCategoricalCrossentropy(from_logits = True),
-        
-        # no need to turn on from_logits if the network output is already a probability distribution like softmax
-        loss = tensorflow.keras.losses.SparseCategoricalCrossentropy(from_logits = False),
+        loss = loss_fn,
         
         metrics = ["accuracy"],
         #run_eagerly = True,
@@ -1355,6 +1356,9 @@ def main() :
             self.prev_epoch = 0
             self.prev_step = 0
             
+            self.curr_epoch = 0
+            self.curr_step = 0
+            
             print("Initialized instance of CustomCallback.")
         
         
@@ -1369,13 +1373,35 @@ def main() :
         
         def on_train_batch_end(self, batch, logs = None) :
             
-            self.prev_step = nBatch_trn * self.prev_epoch + batch
+            self.prev_step = nBatch_trn*self.prev_epoch + batch
+            self.curr_step = nBatch_trn*self.curr_epoch + batch
             
             #print("%"*10, self.prev_step)
             #print(self.model.predict(self.d_dataset_trn[0]))
+            #print("on_train_batch_end logs:", logs)
+            
+            if (logs is None) :
+                
+                return
+            
+            if (
+                not self.prev_step or
+                not (self.prev_step%d_loadConfig["batchLog"]) or
+                self.prev_step == nBatch_trn-1
+            ) :
+                
+                with tensorboard_file_writer_trn.as_default() :
+                    
+                    tensorflow.summary.scalar("batch_loss", logs["loss"], step = self.curr_step)
+                    tensorflow.summary.scalar("batch_accuracy", logs["accuracy"], step = self.curr_step)
         
         
-        def on_epoch_end(self, epoch, logs = None):
+        def on_epoch_begin(self, epoch, logs = None) :
+            
+            self.curr_epoch = epoch
+        
+        
+        def on_epoch_end(self, epoch, logs = None) :
             
             self.prev_epoch = epoch
             
@@ -1385,9 +1411,33 @@ def main() :
                 tensorflow.summary.scalar("learning_rate", self.model.optimizer.learning_rate(self.prev_step), step = epoch)
             
             keys = list(logs.keys())
+            #print(keys)
+            #print("on_epoch_end logs:", logs)
             
             d_pred_trn = {}
             d_pred_tst = {}
+            
+            #print(
+            #    "===== Epoch loss: train %0.4f, val %0.4f =====" %(
+            #    loss_fn(
+            #        numpy.array([ele for ele in dataset_label_trn.as_numpy_iterator()]),
+            #        self.model.predict(
+            #            tensorflow.data.Dataset.zip((dataset_image_trn, dataset_label_trn, dataset_weight_trn)).batch(batch_size = batch_size)
+            #        )
+            #    ).numpy(),
+            #    
+            #    loss_fn(
+            #        numpy.array([ele for ele in dataset_label_tst.as_numpy_iterator()]),
+            #        self.model.predict(
+            #            tensorflow.data.Dataset.zip((dataset_image_tst, dataset_label_tst, dataset_weight_tst)).batch(batch_size = batch_size)
+            #        )
+            #    ).numpy(),
+            #))
+            
+            #print(model.history.__dict__)
+            
+            #print("Trn pred shape", self.model.predict(dataset_trn).shape)
+            #print("Tst pred shape", self.model.predict(dataset_tst).shape)
             
             for cat in d_catInfo_trn.keys() :
                 
@@ -1397,8 +1447,8 @@ def main() :
                 d_pred_trn[cat] = pred_trn
                 d_pred_tst[cat] = pred_tst
                 
-                #print("Trn %s:" %(str(cat)), pred_trn.shape)
-                #print("Tst %s:" %(str(cat)), pred_tst.shape)
+                print("Trn pred shape (cat%d)" %(cat), pred_trn.shape)
+                print("Tst pred shape (cat%d)" %(cat), pred_tst.shape)
                 
                 #print(self.model.input)
                 #print(self.model.output)
@@ -1517,8 +1567,10 @@ def main() :
         write_images = False,
         write_steps_per_second = False,
         update_freq = "epoch",
+        #update_freq = 10,
         #profile_batch = (1, nBatch_trn),
-        profile_batch = nBatch_trn,
+        #profile_batch = nBatch_trn,
+        #profile_batch = 10,
         embeddings_freq = 0,
         embeddings_metadata = None,
     )
