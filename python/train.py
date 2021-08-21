@@ -1533,8 +1533,8 @@ def main() :
                         tensorflow.summary.scalar("auc_cat%d_vs_cat%d" %(cat_sig, cat_bkg), auc_tst, step = epoch)
                         
                         tfimage = utils.get_tfimage_roc(
-                            x = arr_eff_sig_trn,
-                            y = arr_eff_bkg_trn,
+                            x = arr_eff_sig_tst,
+                            y = arr_eff_bkg_tst,
                             style = "-",
                             xlabel = "cat%d efficiency" %(cat_sig),
                             ylabel = "cat%d efficiency" %(cat_bkg),
