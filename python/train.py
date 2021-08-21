@@ -526,7 +526,8 @@ def main() :
         
         datetime_tag = "%s" %(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
     
-    out_tag = "%s%s%s" %(out_tag, "_"*int(len(out_tag)*len(datetime_tag) > 0), datetime_tag)
+    #out_tag = "%s%s%s" %(out_tag, "_"*int(len(out_tag)*len(datetime_tag) > 0), datetime_tag)
+    out_tag = "_".join([out_tag, datetime_tag])
     
     checkpoint_dir = "%s/model_checkpoints/%s" %(args.outdirbase, out_tag)
     tensorboard_dir = "%s/tensorboard/%s" %(args.outdirbase, out_tag)
@@ -1329,6 +1330,21 @@ def main() :
         
         def __init__(self) :
             
+            self.cb_dataset_trn = tensorflow.data.Dataset.zip(
+                (dataset_image_trn, dataset_label_trn, dataset_weight_trn)
+            ).batch(
+                batch_size = batch_size,
+                num_parallel_calls = tensorflow.data.AUTOTUNE
+            ).prefetch(tensorflow.data.AUTOTUNE)
+            
+            self.cb_dataset_tst = tensorflow.data.Dataset.zip(
+                (dataset_image_tst, dataset_label_tst, dataset_weight_tst)
+            ).batch(
+                batch_size = batch_size,
+                num_parallel_calls = tensorflow.data.AUTOTUNE
+            ).prefetch(tensorflow.data.AUTOTUNE)
+            
+            
             self.d_dataset_trn = {}
             self.d_dataset_tst = {}
             
@@ -1394,6 +1410,19 @@ def main() :
                     
                     tensorflow.summary.scalar("batch_loss", logs["loss"], step = self.curr_step)
                     tensorflow.summary.scalar("batch_accuracy", logs["accuracy"], step = self.curr_step)
+                
+                with tensorboard_file_writer_tst.as_default() :
+                    
+                    y_pred = self.model.predict(self.cb_dataset_tst)
+                    
+                    accuracy_fn = tensorflow.keras.metrics.SparseCategoricalAccuracy()
+                    accuracy_fn.update_state(arr_label_tst, y_pred)
+                    accuracy = accuracy_fn.result().numpy()
+                    
+                    loss = loss_fn(arr_label_tst, y_pred).numpy()
+                    
+                    tensorflow.summary.scalar("batch_loss", loss, step = self.curr_step)
+                    tensorflow.summary.scalar("batch_accuracy", accuracy, step = self.curr_step)
         
         
         def on_epoch_begin(self, epoch, logs = None) :
@@ -1404,6 +1433,35 @@ def main() :
         def on_epoch_end(self, epoch, logs = None) :
             
             self.prev_epoch = epoch
+            
+            with tensorboard_file_writer_trn.as_default() :
+                
+                y_pred = self.model.predict(self.cb_dataset_trn)
+                
+                accuracy_fn = tensorflow.keras.metrics.SparseCategoricalAccuracy()
+                accuracy_fn.update_state(arr_label_trn, y_pred)
+                accuracy = accuracy_fn.result().numpy()
+                
+                loss = loss_fn(arr_label_trn, y_pred).numpy()
+                
+                tensorflow.summary.scalar("my_epoch_loss", loss, step = epoch)
+                tensorflow.summary.scalar("my_epoch_accuracy", accuracy, step = epoch)
+            
+            
+            with tensorboard_file_writer_tst.as_default() :
+                
+                y_pred = self.model.predict(self.cb_dataset_tst)
+                
+                accuracy_fn = tensorflow.keras.metrics.SparseCategoricalAccuracy()
+                accuracy_fn.update_state(arr_label_tst, y_pred)
+                accuracy = accuracy_fn.result().numpy()
+                
+                loss = loss_fn(arr_label_tst, y_pred).numpy()
+                
+                tensorflow.summary.scalar("my_epoch_loss", loss, step = epoch)
+                tensorflow.summary.scalar("my_epoch_accuracy", accuracy, step = epoch)
+            
+            
             
             with tensorboard_file_writer_params.as_default() :
                 
