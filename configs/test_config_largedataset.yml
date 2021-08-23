@@ -105,7 +105,9 @@ batchLog: 100
 nEpoch: 100
 learningRate:
     epoch:
-        - 50
+        - 20
+        - 40
     rate:
         - 0.0001
-        - 0.0001
+        - 0.00005
+        - 0.00001

@@ -526,8 +526,7 @@ def main() :
         
         datetime_tag = "%s" %(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
     
-    #out_tag = "%s%s%s" %(out_tag, "_"*int(len(out_tag)*len(datetime_tag) > 0), datetime_tag)
-    out_tag = "_".join([out_tag, datetime_tag])
+    out_tag = "%s%s%s" %(out_tag, "_"*int(len(out_tag)*len(datetime_tag) > 0), datetime_tag)
     
     checkpoint_dir = "%s/model_checkpoints/%s" %(args.outdirbase, out_tag)
     tensorboard_dir = "%s/tensorboard/%s" %(args.outdirbase, out_tag)
