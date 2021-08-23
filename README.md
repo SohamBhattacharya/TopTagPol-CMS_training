@@ -31,15 +31,20 @@ The tensorboard info will be saved in `training_results/tensorboard` with the da
 9. Once the training starts, the model checkpoint and tensorboard directories will be created, and the latter can be viewed on a browser, even when the training is ongoing.
 
 # View the tensorboard page
-1. On another shell, login to NAF, cd to the training directory and run one of the following:
-    * Particular training(s): \
-    `tensorboard --logdir training_results/tensorboard/<dir1> training_results/tensorboard/<dir2> ...`. \
-    Here `<dirN>` is any particular training under `training_results/tensorboard`.
-    * The latest training (by date and time): \
+1. On another terminal, log into NAF with: \
+    `ssh -L 6006:127.0.0.1:6006 <username>@naf-cms.desy.de`.
+2. `cd` to the training directory and run one of the following:
+    * View a particular training: \
+    `tensorboard --logdir <dir>`. \
+    Here `<dir>` is any particular training under `training_results/tensorboard`.
+    * View multiple trainings: \
+    `tensorboard --logdir_spec <name1>:<dir1>,<name2>:<dir2>, ...`. \
+    That is, a comma-separated list of `<name>:<dir>`. You can enter any `<name>` for a particular `<dir>`.
+    * View  latest training (by date and time): \
     `tensorboard --logdir $(find training_results/tensorboard/ -maxdepth 1 | sort -V | tail -n 1)`.
-2. On your machine run: `ssh -L 6006:127.0.0.1:6006 <username>@<host>.desy.de`. \
-N.B. Use the same host as in step 1. For example, if you log into `naf-cms20.desy.de`, use the same as host here.
-3. From the browser on your machine, open: `http://127.0.0.1:6006`
+    * If you want the latest training of a particular `<tag>`:
+    `tensorboard --logdir $(find training_results/tensorboard/ -maxdepth 1 | grep <tag> | sort -V | tail -n 1)`.
+3. From the browser on your machine, open: `http://127.0.0.1:6006` or `http://localhost:6006`.
 
 # Miscellaneous
 * Install the terminator terminal: makes life significantly easier! \
