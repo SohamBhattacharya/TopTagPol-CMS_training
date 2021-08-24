@@ -200,6 +200,7 @@ def ResNeXt(
     # resnext body
     #init_filters = 128
     init_filters = 32
+    
     for stage, rep in enumerate(model_params.repetitions):
         for block in range(rep):
 

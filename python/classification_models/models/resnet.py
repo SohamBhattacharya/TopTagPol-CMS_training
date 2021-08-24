@@ -226,7 +226,7 @@ def ResNet(model_params, input_shape=None, input_tensor=None, include_top=True,
     bn_params = get_bn_params()
     conv_params = get_conv_params()
     #init_filters = 64
-    init_filters = 32
+    init_filters = 16
 
     # resnet bottom
     x = layers.BatchNormalization(name='bn_data', **no_scale_bn_params)(img_input)

@@ -124,7 +124,8 @@ def build_and_get_ResNeXt50(input_shape, nCategory) :
         input_shape = input_shape,
         input_tensor = layer_spd,
         include_top = False,
-        classes = nCategory
+        classes = nCategory,
+        #groups = 16,
     )
     
     x = layers.GlobalAveragePooling2D()(base_model.output)

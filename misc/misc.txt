@@ -2,4 +2,4 @@ rsync -asP --no-perms --no-owner --no-group --exclude "*.root" --exclude "*.svn*
 
 tensorboard --logdir training_results/tensorboard/
 tensorboard --logdir `find training_results/tensorboard/ -maxdepth 1 | sort -V | tail -n 1`
-ssh -L 6006:127.0.0.1:6006 sobhatta@naf-cms24.desy.de
+ssh -Y -o ServerAliveInterval=60 -o TCPKeepAlive=yes -L 6006:127.0.0.1:6006 sobhatta@naf-cms24.desy.de

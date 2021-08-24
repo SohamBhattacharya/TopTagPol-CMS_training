@@ -1184,7 +1184,11 @@ def main() :
     nEpoch = d_loadConfig["nEpoch"]
     
     model = networks.d_network[network_name](input_shape = img_shape, nCategory = nCategory)
-    model.summary()
+    
+    model_summary_str = []
+    model.summary(print_fn = lambda x: model_summary_str.append(x))
+    model_summary_str = "\n".join(model_summary_str)
+    print(model_summary_str)
     
     
     #class MyLRSchedule(tensorflow.keras.optimizers.schedules.LearningRateSchedule) :
@@ -1234,12 +1238,17 @@ def main() :
     tensorboard_file_writer_config = tensorflow.summary.create_file_writer("%s/config" %(tensorboard_dir))
     #tensorboard_file_writer.set_as_default()
     
-    
     with tensorboard_file_writer_config.as_default() :
         
         tensorflow.summary.text(
             "configuration",
             "```\n%s\n```" %(d_loadConfig["fileContent"]),
+            step = 0,
+        )
+        
+        tensorflow.summary.text(
+            "model",
+            "```\n%s\n```" %(model_summary_str),
             step = 0,
         )
     

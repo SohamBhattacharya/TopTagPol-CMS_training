@@ -175,7 +175,7 @@ def get_tfimage_roc(
     ylabel = "",
 ) : 
     
-    fig = matplotlib.pyplot.figure(figsize = [10, 10])
+    fig = matplotlib.pyplot.figure(figsize = [5, 5])
     axis = fig.add_subplot(1, 1, 1)
     
     #axis.set_aspect("equal", "box")

@@ -98,7 +98,7 @@ layers:
 jetName : "[jet]:jet_selectedPatJetsAK15PFPuppi_boost_2_1_sd_0p1_0_1"
 loadEventPerJob: 20000
 cpuFrac: 0.99
-network: ResNet50
+network: ResNet50NoDOL
 testFraction: 0.2
 batchSize: 2000
 batchLog: 100
