@@ -49,34 +49,6 @@ import utils
 
 
 # https://cmsdoxygen.web.cern.ch/cmsdoxygen/CMSSW_10_5_0/doc/html/dc/d55/classreco_1_1PFCandidate.html#ac55e8d12f21ad7c3fb6400f7fa60690c
-d_pdgid2layer = {
-    +211     : numpy.uint32(0),
-    -211     : numpy.uint32(0),
-    
-    +11      : numpy.uint32(1),
-    -11      : numpy.uint32(1),
-    
-    +13      : numpy.uint32(2),
-    -13      : numpy.uint32(2),
-    
-    +22      : numpy.uint32(3),
-    -22      : numpy.uint32(3),
-    
-    +130     : numpy.uint32(4),
-    -130     : numpy.uint32(4),
-    
-    +1       : numpy.uint32(5),
-    -1       : numpy.uint32(5),
-    
-    +2       : numpy.uint32(6),
-    -2       : numpy.uint32(6),
-    
-    0        : numpy.uint32(7),
-}
-
-vec_pdgid2layer = numpy.vectorize(d_pdgid2layer.get)
-
-
 class ImageSpec :
     
     def __init__(
@@ -240,48 +212,6 @@ class InputData :
         
         self.arr_val_shared.close()
         self.arr_val_shared.unlink()
-
-
-def getMemoryMB(process = -1) :
-    
-    if (process < 0) :
-        
-        process = psutil.Process(os.getpid())
-    
-    mem = process.memory_info().rss / 1024.0**2
-    
-    return mem
-
-
-def pdgid2layer(pdgid) :
-    
-    pdgid = abs(pdgid)
-    
-    if (pdgid == 211) :
-        return 0
-        
-    if (pdgid == 11) :
-        return 1
-        
-    if (pdgid == 13) :
-        return 2
-        
-    if (pdgid == 22) :
-        return 3
-        
-    if (pdgid == 130) :
-        return 4
-        
-    if (pdgid == 1) :
-        return 5
-        
-    if (pdgid == 2) :
-        return 6
-        
-    if (pdgid == 0) :
-        return 7
-    
-    return 7
 
 
 def computeBins(
@@ -591,7 +521,7 @@ def main() :
     nLayer = len(l_layerInfo)
     img_shape = (imgSpec.nBinY, imgSpec.nBinX, nLayer)
     
-    print("=====> Loading trees... Memory:", getMemoryMB())
+    print("=====> Loading trees... Memory:", utils.getMemoryMB())
     
     d_catInfo_trn = sortedcontainers.SortedDict()
     d_catInfo_tst = sortedcontainers.SortedDict()
@@ -661,7 +591,7 @@ def main() :
             
     
     
-    print("=====> Reading branches... Memory:", getMemoryMB())
+    print("=====> Reading branches... Memory:", utils.getMemoryMB())
     
     
     def read_data(d_catInfo) :
@@ -921,7 +851,7 @@ def main() :
                         gc.collect()
                     
                     print("Processed output of read-job num %d (%d/%d done) of category %d." %(iJob+1, sum(l_isJobDone), len(l_job), catNum))
-                    print("=====> Memory:", getMemoryMB())
+                    print("=====> Memory:", utils.getMemoryMB())
         
         
         pool.join()
@@ -995,7 +925,7 @@ def main() :
         arr_val = inpData.arr_val
         
         
-        print("=====> Read branches... Memory:", getMemoryMB())
+        print("=====> Read branches... Memory:", utils.getMemoryMB())
         
         nJetTot = len(arr_label)
         print("nJetTot = %d" %(nJetTot))
@@ -1003,7 +933,7 @@ def main() :
         img_shape = (imgSpec.nBinY, imgSpec.nBinX, nLayer)
         input_shape = (nJetTot,) + img_shape
         
-        print("=====> Creating sparse tensor... Memory:", getMemoryMB())
+        print("=====> Creating sparse tensor... Memory:", utils.getMemoryMB())
         
         #arr_nonzero_idx = (arr_idx != [0, 0, 0, 0]).any(axis = 1).nonzero()
         arr_nonzero_idx = arr_val.nonzero()[0]
@@ -1017,18 +947,18 @@ def main() :
             dense_shape = input_shape,
         ))
         
-        print("=====> Created sparse tensor... Memory:", getMemoryMB())
+        print("=====> Created sparse tensor... Memory:", utils.getMemoryMB())
         print(arr_inputdata)
         
-        print("=====> Freeing shared buffer... Memory:", getMemoryMB())
+        print("=====> Freeing shared buffer... Memory:", utils.getMemoryMB())
         inpData.close()
-        print("=====> Freed shared buffer... Memory:", getMemoryMB())
+        print("=====> Freed shared buffer... Memory:", utils.getMemoryMB())
         
         
         batch_size = d_loadConfig["batchSize"]
         nBatch = int(numpy.ceil(nJetTot/float(batch_size))) # + int(len(arr_shuffledIdx)%batch_size > 0)
         
-        print("=====> Creating dataset... Memory:", getMemoryMB())
+        print("=====> Creating dataset... Memory:", utils.getMemoryMB())
         
         #arr_inputdata = tensorflow.sparse.to_dense(arr_inputdata)
         dataset_image = tensorflow.data.Dataset.from_tensor_slices(arr_inputdata)
@@ -1036,7 +966,7 @@ def main() :
         dataset_weight = tensorflow.data.Dataset.from_tensor_slices(arr_weight)
         dataset = tensorflow.data.Dataset.zip((dataset_image, dataset_label, dataset_weight)).shuffle(buffer_size = nJetTot, reshuffle_each_iteration = False).batch(batch_size = batch_size, num_parallel_calls = tensorflow.data.AUTOTUNE).prefetch(tensorflow.data.AUTOTUNE)
         
-        print("=====> Created dataset... Memory:", getMemoryMB())
+        print("=====> Created dataset... Memory:", utils.getMemoryMB())
         print(dataset.element_spec)
         
         return (dataset, dataset_image, dataset_label, dataset_weight)
@@ -1319,7 +1249,7 @@ def main() :
         from_logits = False
     )
     
-    print("=====> Compiling model... Memory:", getMemoryMB())
+    print("=====> Compiling model... Memory:", utils.getMemoryMB())
     
     model.compile(
         #optimizer = "adam",
@@ -1331,7 +1261,7 @@ def main() :
         #run_eagerly = True,
     )
     
-    print("=====> Compiled model... Memory:", getMemoryMB())
+    print("=====> Compiled model... Memory:", utils.getMemoryMB())
     
     
     class CustomCallback(tensorflow.keras.callbacks.Callback):
@@ -1644,7 +1574,7 @@ def main() :
     
     
     
-    print("=====> Starting fit... Memory:", getMemoryMB())
+    print("=====> Starting fit... Memory:", utils.getMemoryMB())
     
     history = model.fit(
         x = dataset_trn,

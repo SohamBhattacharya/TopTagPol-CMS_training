@@ -38,12 +38,12 @@ The tensorboard info will be saved in `training_results/tensorboard` with the da
     `tensorboard --logdir <dir>`. \
     Here `<dir>` is any particular training under `training_results/tensorboard`.
     * View multiple trainings: \
-    `tensorboard --logdir_spec <name1>:<dir1>,<name2>:<dir2>, ...`. \
+    `tensorboard --port 6006 --logdir_spec <name1>:<dir1>,<name2>:<dir2>, ...`. \
     That is, a comma-separated list of `<name>:<dir>`. You can enter any `<name>` for a particular `<dir>`.
-    * View  latest training (by date and time): \
-    `tensorboard --logdir $(find training_results/tensorboard/ -maxdepth 1 | sort -V | tail -n 1)`.
+    * View latest training (note, this will sort using the directory name): \
+    `tensorboard --port 6006 --logdir $(find training_results/tensorboard/ -mindepth 1 -maxdepth 1 | sort -V | tail -n 1)`.
     * If you want the latest training of a particular `<tag>`:
-    `tensorboard --logdir $(find training_results/tensorboard/ -maxdepth 1 | grep <tag> | sort -V | tail -n 1)`.
+    `tensorboard --port 6006 --logdir $(find training_results/tensorboard/ -mindepth 1 -maxdepth 1 | grep <tag> | sort -V | tail -n 1)`.
 3. From the browser on your machine, open: `http://127.0.0.1:6006` or `http://localhost:6006`.
 
 # Miscellaneous

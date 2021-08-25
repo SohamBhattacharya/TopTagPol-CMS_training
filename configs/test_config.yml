@@ -4,6 +4,9 @@ categories:
         cut: "([jet]_pT_reco > 200) & (abs([jet]_eta_reco) < 2.4) & ([jet]_nConsti_reco >= 3) & ([jet]_nearestGenTopDR_reco < 1) & ([jet]_nearestGenTopIsLeptonic_reco > 0.5)"
         ########## fileName:tree:weight:njetmax ##########
         samples:
+            - "sourceFiles/TTJets_HT-600to800_TuneCP5_13TeV-madgraphMLM-pythia8_RunIIAutumn18MiniAOD-102X_upgrade2018_realistic_v15-v1_MINIAODSIM_2021-08-23_17-06-29.txt:treeMaker/tree:1:1000"
+            - "sourceFiles/TTJets_HT-800to1200_TuneCP5_13TeV-madgraphMLM-pythia8_RunIIAutumn18MiniAOD-102X_upgrade2018_realistic_v15-v1_MINIAODSIM_2021-08-23_18-04-50.txt:treeMaker/tree:1:1000"
+            - "sourceFiles/TTJets_HT-1200to2500_TuneCP5_13TeV-madgraphMLM-pythia8_RunIIAutumn18MiniAOD-102X_upgrade2018_realistic_v15-v1_MINIAODSIM_2021-08-23_21-49-06.txt:treeMaker/tree:1:1000"
             - "sourceFiles/ZprimeToTT_M1000_W10_TuneCP2_PSweights_13TeV-madgraphMLM-pythia8_RunIIAutumn18MiniAOD-102X_upgrade2018_realistic_v15-v1_MINIAODSIM_2021-07-22_15-56-01.txt:treeMaker/tree:1:1000"
             - "sourceFiles/ZprimeToTT_M1000_W100_TuneCP2_PSweights_13TeV-madgraphMLM-pythia8_RunIIAutumn18MiniAOD-102X_upgrade2018_realistic_v15-v1_MINIAODSIM_2021-07-22_15-56-08.txt:treeMaker/tree:1:1000"
             - "sourceFiles/ZprimeToTT_M1000_W300_TuneCP2_PSweights_13TeV-madgraphMLM-pythia8_RunIIAutumn18MiniAOD-102X_upgrade2018_realistic_v15-v1_MINIAODSIM_2021-07-22_15-56-13.txt:treeMaker/tree:1:1000"
@@ -98,9 +101,9 @@ layers:
 jetName : "[jet]:jet_selectedPatJetsAK15PFPuppi_boost_2_1_sd_0p1_0_1"
 loadEventPerJob: 500
 cpuFrac: 0.99
-network: CNN1
+network: ResNeXt50
 testFraction: 0.2
-batchSize: 1000
+batchSize: 2000
 batchLog: 10
 nEpoch: 100
 learningRate:

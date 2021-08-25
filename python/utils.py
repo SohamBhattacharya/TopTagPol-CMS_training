@@ -6,6 +6,7 @@ import matplotlib.pyplot
 #import mplhep
 import numpy
 import os
+import psutil
 import re
 import sortedcontainers
 import sparse
@@ -165,6 +166,17 @@ def run_cmd_list(l_cmd) :
         if (retval) :
             
             exit()
+
+
+def getMemoryMB(process = -1) :
+    
+    if (process < 0) :
+        
+        process = psutil.Process(os.getpid())
+    
+    mem = process.memory_info().rss / 1024.0**2
+    
+    return mem
 
 
 def get_tfimage_roc(
