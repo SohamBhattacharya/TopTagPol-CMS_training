@@ -242,6 +242,7 @@ dependencies:
     - six==1.15.0
     - sortedcontainers==2.4.0
     - sparse==0.12.0
+    - tabulate==0.8.9
     - tensorboard==2.5.0
     - tensorboard-data-server==0.6.1
     - tensorboard-plugin-profile==2.4.0
@@ -249,6 +250,7 @@ dependencies:
     - tensorflow==2.5.0
     - tensorflow-estimator==2.5.0
     - termcolor==1.1.0
+    - tfmpl==1.0.2
     - threadpoolctl==2.2.0
     - typing-extensions==3.7.4.3
     - uhi==0.2.1
