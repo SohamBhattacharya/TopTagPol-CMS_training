@@ -45,6 +45,7 @@ mixed_precision.set_global_policy(policy)
 
 import networks
 import utils
+import utils_tensorflow
 
 
 
@@ -189,7 +190,7 @@ class InputData :
         self.nCol = nCol
         
         
-        arr_idx = numpy.empty((nRow, 4), dtype = numpy.uint32)
+        arr_idx = numpy.empty((nRow, nCol), dtype = numpy.uint32)
         arr_val = numpy.empty(nRow, dtype = numpy.float16)
         
         self.arr_idx_shared = multiprocessing.shared_memory.SharedMemory(create = True, size = arr_idx.nbytes)
@@ -742,7 +743,7 @@ def main() :
             catInfo = d_catInfo[cat]
             catNum = catInfo.catNum
             
-            for iSample, sample_fileAndTreeName in enumerate(catInfo.l_sample_fileAndTreeName):
+            for iSample, sample_fileAndTreeName in enumerate(catInfo.l_sample_fileAndTreeName) :
                 
                 treeIdx_start = catInfo.l_sample_treeIdx_start[iSample]
                 treeIdx_start = 0 if (treeIdx_start < 0) else treeIdx_start
@@ -1243,11 +1244,101 @@ def main() :
         )
     
     
+    def my_loss(y_true, y_pred) :
+        
+        y_true = tensorflow.convert_to_tensor(y_true)
+        y_pred = tensorflow.convert_to_tensor(y_pred)
+        
+        if (tensorflow.rank(y_true) == 1) :
+            
+            y_true = tensorflow.expand_dims(y_true, axis = 1)
+            #print("y_true (after expand_dims):", y_true)
+            #print("y_true.get_shape().as_list():", y_true.get_shape().as_list())
+        
+        dtype = y_pred.dtype
+        nRow = y_true.get_shape().as_list()[0]
+        
+        #print("y_true:", y_true)
+        
+        y_true_onehot = tensorflow.one_hot(indices = tensorflow.gather(y_true, 0, axis = 1), depth = nCategory, dtype = dtype)
+        #print("y_true_onehot:", y_true_onehot)
+        
+        y0_true_onehot = tensorflow.gather(y_true_onehot, 0, axis = 1)
+        
+        #print("y_pred:", y_pred)
+        
+        y0_pred = tensorflow.gather(y_pred, 0, axis = 1)
+        #print("y0_pred:", y0_pred)
+        
+        D = 0.5*(tensorflow.math.tanh(50*(y0_pred-0.1)) + 1)
+        D = tensorflow.expand_dims(D, axis = 1)
+        #print("D:", D)
+        
+        ones = tensorflow.ones([nRow, 1], dtype = dtype)
+        #print("ones:", ones)
+        
+        scale = tensorflow.concat([ones] + [D]*(nCategory-1), axis = 1)
+        #print("scale:", scale)
+        
+        epsilon = tensorflow.keras.backend.epsilon()
+        #epsilon = 1e-6
+        
+        loss_term1_tensor = (1.0/0.854) * (1-y0_true_onehot) * tensorflow.math.pow(y0_pred, 0.5) * tensorflow.math.log(1.0 - tensorflow.clip_by_value(y0_pred, epsilon, 1.0-epsilon))
+        
+        loss_term2_tensor = scale * y_true_onehot * tensorflow.math.log(tensorflow.clip_by_value(y_pred, epsilon, 1.0-epsilon))
+        
+        #print("loss_term1_tensor:", loss_term1_tensor)
+        #print("loss_term2_tensor:", loss_term2_tensor)
+        #print("tensorflow.math.reduce_sum(loss_term2_tensor, axis = 1):", tensorflow.math.reduce_sum(loss_term2_tensor, axis = 1))
+        
+        
+        # Sum each row (event)
+        loss_perrow = tensorflow.math.reduce_sum(loss_term2_tensor, axis = 1) + loss_term1_tensor
+        #print("loss_perrow:", loss_perrow)
+        
+        # Average over all rows
+        loss = -tensorflow.math.reduce_mean(loss_perrow)
+        #print("loss:", loss)
+        
+        #print("loss:", loss)
+        
+        #if (numpy.isnan(loss.numpy()) or numpy.isinf(loss.numpy())) :
+        #    
+        #    print(tensorflow.where(tensorflow.math.is_nan(loss_tensor)))
+        #    print(tensorflow.where(tensorflow.math.is_inf(loss_tensor)))
+        #    print("tensorflow.math.reduce_min(y_pred):", tensorflow.math.reduce_min(y_pred))
+        #    print("tensorflow.math.reduce_min(loss_tensor):", tensorflow.math.reduce_min(loss_tensor))
+        #    
+        #    print("y_pred nan:", tensorflow.gather(y_pred, indices = tensorflow.gather(tensorflow.where(tensorflow.math.is_nan(loss_tensor)), 0, axis = 1)))
+        #    print("y_pred inf:", tensorflow.gather(y_pred, indices = tensorflow.gather(tensorflow.where(tensorflow.math.is_inf(loss_tensor)), 0, axis = 1)))
+        #    
+        #    #print(tensorflow.gather(scale, indices = tensorflow.gather(tensorflow.where(tensorflow.math.is_nan(scale)), 0, axis = 1)))
+        #    
+        #    print("tensorflow.math.reduce_sum(loss_tensor):", tensorflow.math.reduce_sum(loss_tensor))
+        #    print("nRow:", nRow)
+        #    
+        #    #exit()
+        
+        
+        return loss
+    
+    
+    
     # Loss definition
     # no need to turn on from_logits if the network output is already a probability distribution like softmax
-    loss_fn = tensorflow.keras.losses.SparseCategoricalCrossentropy(
+    loss_categorical_crossentropy = tensorflow.keras.losses.SparseCategoricalCrossentropy(
         from_logits = False
     )
+    
+    
+    #loss_fn = loss_categorical_crossentropy
+    loss_fn = my_loss
+    
+    
+    
+    # Accuracy definition
+    sparse_categorical_accuracy = tensorflow.keras.metrics.SparseCategoricalAccuracy()
+    
     
     print("=====> Compiling model... Memory:", utils.getMemoryMB())
     
@@ -1256,9 +1347,12 @@ def main() :
         optimizer = optimizer,
         
         loss = loss_fn,
+        #loss = my_loss,
         
-        metrics = ["accuracy"],
-        #run_eagerly = True,
+        #metrics = ["accuracy"],
+        metrics = [sparse_categorical_accuracy],
+        
+        run_eagerly = True,
     )
     
     print("=====> Compiled model... Memory:", utils.getMemoryMB())
@@ -1347,7 +1441,8 @@ def main() :
                 with tensorboard_file_writer_trn.as_default() :
                     
                     tensorflow.summary.scalar("batch_loss", logs["loss"], step = self.curr_step)
-                    tensorflow.summary.scalar("batch_accuracy", logs["accuracy"], step = self.curr_step)
+                    #tensorflow.summary.scalar("batch_accuracy", logs["accuracy"], step = self.curr_step)
+                    tensorflow.summary.scalar("batch_accuracy", logs["sparse_categorical_accuracy"], step = self.curr_step)
                 
                 with tensorboard_file_writer_tst.as_default() :
                     
@@ -1381,6 +1476,12 @@ def main() :
                 accuracy = accuracy_fn.result().numpy()
                 
                 loss = loss_fn(arr_label_trn, y_pred).numpy()
+                #print("my_epoch_loss (train):", loss)
+                #
+                #if (numpy.isnan(loss)) :
+                #    
+                #    print("Encountered nan in my_epoch_loss (train).")
+                #    print(y_pred)
                 
                 tensorflow.summary.scalar("my_epoch_loss", loss, step = epoch)
                 tensorflow.summary.scalar("my_epoch_accuracy", accuracy, step = epoch)
@@ -1395,6 +1496,12 @@ def main() :
                 accuracy = accuracy_fn.result().numpy()
                 
                 loss = loss_fn(arr_label_tst, y_pred).numpy()
+                #print("my_epoch_loss (test):", loss)
+                #
+                #if (numpy.isnan(loss)) :
+                #    
+                #    print("Encountered nan in my_epoch_loss (test).")
+                #    print(y_pred)
                 
                 tensorflow.summary.scalar("my_epoch_loss", loss, step = epoch)
                 tensorflow.summary.scalar("my_epoch_accuracy", accuracy, step = epoch)
@@ -1455,94 +1562,166 @@ def main() :
                     
                     with tensorboard_file_writer_trn.as_default() :
                         
-                        tensorflow.summary.histogram("output_node%d_cat%d" %(node, cat), pred_trn[:, node], step = epoch, buckets = 100)
+                        tensorflow.summary.histogram("output_node%d_cat%d" %(node, cat), pred_trn[:, node], step = epoch, buckets = 500)
                     
                     with tensorboard_file_writer_tst.as_default() :
                         
-                        tensorflow.summary.histogram("output_node%d_cat%d" %(node, cat), pred_tst[:, node], step = epoch, buckets = 100)
+                        tensorflow.summary.histogram("output_node%d_cat%d" %(node, cat), pred_tst[:, node], step = epoch, buckets = 500)
             
             
-            for node in range(nCategory) :
+            for iCat, cat_bkg in enumerate(range(1, nCategory)) :
                 
-                cat_sig = list(d_catInfo_trn.keys())[node]
+                node_sig = 0
+                node_bkg = cat_bkg
+                cat_sig = 0
                 
-                for iCat, cat_bkg in enumerate(list(d_catInfo_trn.keys())) :
+                pred_sig_trn = d_pred_trn[cat_sig][:, node_sig] / (d_pred_trn[cat_sig][:, node_sig] + d_pred_trn[cat_sig][:, node_bkg])
+                pred_bkg_trn = d_pred_trn[cat_bkg][:, node_sig] / (d_pred_trn[cat_bkg][:, node_sig] + d_pred_trn[cat_bkg][:, node_bkg])
+                
+                pred_sig_tst = d_pred_tst[cat_sig][:, node_sig] / (d_pred_tst[cat_sig][:, node_sig] + d_pred_tst[cat_sig][:, node_bkg])
+                pred_bkg_tst = d_pred_tst[cat_bkg][:, node_sig] / (d_pred_tst[cat_bkg][:, node_sig] + d_pred_tst[cat_bkg][:, node_bkg])
+                
+                with tensorboard_file_writer_trn.as_default() :
                     
-                    if (cat_sig == cat_bkg) :
-                        
-                        continue
+                    tensorflow.summary.histogram("classifier_cat%dvs%d_cat%d" %(cat_sig, cat_bkg, cat_sig), pred_sig_trn, step = epoch, buckets = 500)
+                    tensorflow.summary.histogram("classifier_cat%dvs%d_cat%d" %(cat_sig, cat_bkg, cat_bkg), pred_bkg_trn, step = epoch, buckets = 500)
+                
+                with tensorboard_file_writer_tst.as_default() :
                     
+                    tensorflow.summary.histogram("classifier_cat%dvs%d_cat%d" %(cat_sig, cat_bkg, cat_sig), pred_sig_tst, step = epoch, buckets = 500)
+                    tensorflow.summary.histogram("classifier_cat%dvs%d_cat%d" %(cat_sig, cat_bkg, cat_bkg), pred_bkg_tst, step = epoch, buckets = 500)
+                
+                
+                # Train
+                arr_eff_bkg_trn, arr_eff_sig_trn, arr_threshold_trn = sklearn.metrics.roc_curve(
+                    y_true = numpy.repeat(
+                        [cat_sig, cat_bkg],
+                        [len(pred_sig_trn), len(pred_bkg_trn)],
+                    ),
+                    y_score = numpy.concatenate(
+                        [
+                            pred_sig_trn,
+                            pred_bkg_trn,
+                        ],
+                        axis = None,
+                    ),
+                    pos_label = cat_sig,
+                )
+                
+                auc_trn = sklearn.metrics.auc(arr_eff_bkg_trn, arr_eff_sig_trn)
+                
+                
+                # Test
+                arr_eff_bkg_tst, arr_eff_sig_tst, arr_threshold_tst = sklearn.metrics.roc_curve(
+                    y_true = numpy.repeat(
+                        [cat_sig, cat_bkg],
+                        [len(pred_sig_tst), len(pred_bkg_tst)],
+                    ),
+                    y_score = numpy.concatenate(
+                        [
+                            pred_sig_tst,
+                            pred_bkg_tst,
+                        ],
+                        axis = None,
+                    ),
+                    pos_label = cat_sig,
+                )
+                
+                auc_tst = sklearn.metrics.auc(arr_eff_bkg_tst, arr_eff_sig_tst)
+                
+                
+                with tensorboard_file_writer_trn.as_default() :
                     
-                    # Train
-                    arr_eff_bkg_trn, arr_eff_sig_trn, arr_threshold_trn = sklearn.metrics.roc_curve(
-                        y_true = numpy.repeat(
-                            [cat_sig, cat_bkg],
-                            [len(d_pred_trn[cat_sig]), len(d_pred_trn[cat_bkg])],
-                        ),
-                        y_score = numpy.concatenate(
+                    tensorflow.summary.scalar("auc_cat%d_vs_cat%d" %(cat_sig, cat_bkg), auc_trn, step = epoch)
+                    
+                    tfimage = utils_tensorflow.get_tfimage_xyplot(
+                        l_plotdata = [
                             [
-                                d_pred_trn[cat_sig][:, node],
-                                d_pred_trn[cat_bkg][:, node],
+                                arr_eff_sig_trn, arr_eff_bkg_trn, "-", {}
                             ],
-                            axis = None,
-                        ),
-                        pos_label = cat_sig,
+                        ],
+                        xlim = (0, 1),
+                        ylim = (1e-6, 1),
+                        logy = True,
+                        xlabel = "cat%d efficiency" %(cat_sig),
+                        ylabel = "cat%d efficiency" %(cat_bkg),
                     )
+                    tensorflow.summary.image("roc_cat%d_vs_cat%d" %(cat_sig, cat_bkg), tfimage, step = epoch)
                     
-                    auc_trn = sklearn.metrics.auc(arr_eff_bkg_trn, arr_eff_sig_trn)
                     
-                    
-                    # Test
-                    arr_eff_bkg_tst, arr_eff_sig_tst, arr_threshold_tst = sklearn.metrics.roc_curve(
-                        y_true = numpy.repeat(
-                            [cat_sig, cat_bkg],
-                            [len(d_pred_tst[cat_sig]), len(d_pred_tst[cat_bkg])],
-                        ),
-                        y_score = numpy.concatenate(
+                    tfimage = utils_tensorflow.get_tfimage_xyplot(
+                        l_plotdata = [
                             [
-                                d_pred_tst[cat_sig][:, node],
-                                d_pred_tst[cat_bkg][:, node],
+                                arr_threshold_trn, arr_eff_sig_trn, "r-",
+                                {
+                                    "label": "cat%d" %(cat_sig),
+                                },
                             ],
-                            axis = None,
-                        ),
-                        pos_label = cat_sig,
+                            [
+                                arr_threshold_trn, arr_eff_bkg_trn, "b-",
+                                {
+                                    "label": "cat%d" %(cat_bkg),
+                                },
+                            ],
+                        ],
+                        xlim = (0, 1),
+                        ylim = (1e-6, 1),
+                        logy = True,
+                        xlabel = "Cut on cat%d_vs_cat%d classifier" %(cat_sig, cat_bkg),
+                        ylabel = "Efficiency",
                     )
+                    tensorflow.summary.image("eff_cat%d_vs_cat%d" %(cat_sig, cat_bkg), tfimage, step = epoch)
+                
+                with tensorboard_file_writer_tst.as_default() :
                     
-                    auc_tst = sklearn.metrics.auc(arr_eff_bkg_tst, arr_eff_sig_tst)
+                    tensorflow.summary.scalar("auc_cat%d_vs_cat%d" %(cat_sig, cat_bkg), auc_tst, step = epoch)
+                    
+                    tfimage = utils_tensorflow.get_tfimage_xyplot(
+                        l_plotdata = [
+                            [
+                                arr_eff_sig_tst, arr_eff_bkg_tst, "-", {}
+                            ],
+                        ],
+                        xlim = (0, 1),
+                        ylim = (1e-6, 1),
+                        logy = True,
+                        xlabel = "cat%d efficiency" %(cat_sig),
+                        ylabel = "cat%d efficiency" %(cat_bkg),
+                    )
+                    tensorflow.summary.image("roc_cat%d_vs_cat%d" %(cat_sig, cat_bkg), tfimage, step = epoch)
                     
                     
-                    with tensorboard_file_writer_trn.as_default() :
-                        
-                        tensorflow.summary.scalar("auc_cat%d_vs_cat%d" %(cat_sig, cat_bkg), auc_trn, step = epoch)
-                        
-                        tfimage = utils.get_tfimage_roc(
-                            x = arr_eff_sig_trn,
-                            y = arr_eff_bkg_trn,
-                            style = "-",
-                            xlabel = "cat%d efficiency" %(cat_sig),
-                            ylabel = "cat%d efficiency" %(cat_bkg),
-                        )
-                        tensorflow.summary.image("roc_cat%d_vs_cat%d" %(cat_sig, cat_bkg), tfimage, step = epoch)
-                    
-                    with tensorboard_file_writer_tst.as_default() :
-                        
-                        tensorflow.summary.scalar("auc_cat%d_vs_cat%d" %(cat_sig, cat_bkg), auc_tst, step = epoch)
-                        
-                        tfimage = utils.get_tfimage_roc(
-                            x = arr_eff_sig_tst,
-                            y = arr_eff_bkg_tst,
-                            style = "-",
-                            xlabel = "cat%d efficiency" %(cat_sig),
-                            ylabel = "cat%d efficiency" %(cat_bkg),
-                        )
-                        tensorflow.summary.image("roc_cat%d_vs_cat%d" %(cat_sig, cat_bkg), tfimage, step = epoch)
+                    tfimage = utils_tensorflow.get_tfimage_xyplot(
+                        l_plotdata = [
+                            [
+                                arr_threshold_tst, arr_eff_sig_tst, "r-",
+                                {
+                                    "label": "cat%d" %(cat_sig),
+                                },
+                            ],
+                            [
+                                arr_threshold_tst, arr_eff_bkg_tst, "b-",
+                                {
+                                    "label": "cat%d" %(cat_bkg),
+                                },
+                            ],
+                        ],
+                        xlim = (0, 1),
+                        ylim = (1e-6, 1),
+                        logy = True,
+                        xlabel = "Cut on cat%d_vs_cat%d classifier" %(cat_sig, cat_bkg),
+                        ylabel = "Efficiency",
+                    )
+                    tensorflow.summary.image("eff_cat%d_vs_cat%d" %(cat_sig, cat_bkg), tfimage, step = epoch)
     
     
     
-    checkpoint_file = "%s/weights_{epoch:d}.hdf5" %(checkpoint_dir)
+    checkpoint_file = "%s/weights_epoch-{epoch:d}.hdf5" %(checkpoint_dir)
+    #model_save_dir = "%s/model_epoch-{epoch:d}" %(checkpoint_dir)
     
     checkpoint_callback  =  tensorflow.keras.callbacks.ModelCheckpoint(
         filepath = checkpoint_file,
+        ##filepath = model_save_dir,
         monitor = "val_loss",
         verbose = 0,
         save_best_only = False,

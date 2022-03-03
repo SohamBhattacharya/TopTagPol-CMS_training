@@ -2,4 +2,5 @@ Requirements = (OpSysAndVer == "CentOS7")
 Request_GPUs = 1
 request_memory = 30GB
 +RequestRuntime = 345600
+getenv = True
 queue

@@ -1,0 +1,8 @@
+tensorboard --port 6006 --reload_multifile True \
+--logdir_spec \
+pnet_lite_more:training_results/tensorboard/particle_net_lite_more-features_2022-02-19_17-02-07,\
+pnet_min:training_results/tensorboard/particle_net_minimal-features_2022-02-22_19-17-55,\
+pnet_more:training_results/tensorboard/particle_net_more-features_2022-02-22_19-15-58,\
+pnet_more_wxy:training_results/tensorboard/particle_net_more-features-with-xy_2022-02-22_22-59-41,\
+pnet_more_wxy_lessQCD:training_results/tensorboard/particle_net_more-features-with-xy_400K-per-QCD_2022-02-23_09-56-18,\
+pnet_more_wxy_2:training_results/tensorboard/particle_net_more-features-with-xy_500K-per-QCD_with-TTJets-HT-800to1200_2022-02-23_23-03-31

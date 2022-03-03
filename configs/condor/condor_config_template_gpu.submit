@@ -1,0 +1,17 @@
+universe = vanilla
+getenv = True
+
+executable = @exe@
+log = @log@
+output = @out@
+error = @err@
+
+should_transfer_files = IF_NEEDED
+when_to_transfer_output = ON_EXIT
+
+Requirements = (OpSysAndVer == "CentOS7")
+Request_GPUs = 1
+request_memory = 30GB
++RequestRuntime = 345600
+
+queue

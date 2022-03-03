@@ -6,6 +6,7 @@ from tensorflow.keras import datasets, layers, models
 from tensorflow.keras import mixed_precision
 
 import utils
+import utils_tensorflow
 
 
 
@@ -15,7 +16,7 @@ d_network = {}
 def build_and_get_CNN1(input_shape, nCategory) :
     
     model = models.Sequential()
-    model.add(layers.Lambda(function = utils.sparse_to_dense, input_shape = input_shape))
+    model.add(layers.Lambda(function = utils_tensorflow.sparse_to_dense, input_shape = input_shape))
     model.add(layers.Conv2D(50, kernel_size = (10, 10), activation = "relu"))
     model.add(layers.MaxPooling2D((2, 2)))
     model.add(layers.Conv2D(30, kernel_size = (5, 5), activation = "relu"))
@@ -36,7 +37,7 @@ d_network["CNN1"] = build_and_get_CNN1
 def build_and_get_CNN2(input_shape, nCategory) :
     
     model = models.Sequential()
-    model.add(layers.Lambda(function = utils.sparse_to_dense, input_shape = input_shape))
+    model.add(layers.Lambda(function = utils_tensorflow.sparse_to_dense, input_shape = input_shape))
     model.add(layers.Conv2D(50, kernel_size = (10, 10), activation = "relu"))
     model.add(layers.MaxPooling2D((2, 2)))
     model.add(layers.Conv2D(30, kernel_size = (5, 5), activation = "relu"))
@@ -63,7 +64,7 @@ def build_and_get_ResNet50(input_shape, nCategory) :
     resnet50, preproc = Classifiers.get("resnet50")
     
     network_input = layers.Input(shape = input_shape)
-    layer_spd = layers.Lambda(function = utils.sparse_to_dense, input_shape = input_shape)(network_input)
+    layer_spd = layers.Lambda(function = utils_tensorflow.sparse_to_dense, input_shape = input_shape)(network_input)
     
     base_model = resnet50(
         input_shape = input_shape,
@@ -91,7 +92,7 @@ def build_and_get_ResNet50NoDOL(input_shape, nCategory) :
     resnet50, preproc = Classifiers.get("resnet50")
     
     network_input = layers.Input(shape = input_shape)
-    layer_spd = layers.Lambda(function = utils.sparse_to_dense, input_shape = input_shape)(network_input)
+    layer_spd = layers.Lambda(function = utils_tensorflow.sparse_to_dense, input_shape = input_shape)(network_input)
     
     base_model = resnet50(
         input_shape = input_shape,
@@ -118,7 +119,7 @@ def build_and_get_ResNeXt50(input_shape, nCategory) :
     resnext50, preproc = Classifiers.get("resnext50")
     
     network_input = layers.Input(shape = input_shape)#, sparse = True)
-    layer_spd = layers.Lambda(function = utils.sparse_to_dense, input_shape = input_shape)(network_input)
+    layer_spd = layers.Lambda(function = utils_tensorflow.sparse_to_dense, input_shape = input_shape)(network_input)
     
     base_model = resnext50(
         input_shape = input_shape,
@@ -147,7 +148,7 @@ def build_and_get_ResNeXt50NoDOL(input_shape, nCategory) :
     resnext50, preproc = Classifiers.get("resnext50")
     
     network_input = layers.Input(shape = input_shape)#, sparse = True)
-    layer_spd = layers.Lambda(function = utils.sparse_to_dense, input_shape = input_shape)(network_input)
+    layer_spd = layers.Lambda(function = utils_tensorflow.sparse_to_dense, input_shape = input_shape)(network_input)
     
     base_model = resnext50(
         input_shape = input_shape,

@@ -7,54 +7,60 @@ import subprocess
 import utils
 
 
-cwd = os.getcwd()
-#cwd = "%s/src" %(subprocess.check_output(["echo", "$CMSSW_BASE"]).strip())
-#proxy = subprocess.check_output(["voms-proxy-info", "--path"]).strip()
-
-
-# Argument parser
-parser = argparse.ArgumentParser(formatter_class = argparse.RawTextHelpFormatter)
-
-parser.add_argument(
-    "--tag",
-    help = "Will append \"_<tag>_<datetime>\" to the output directories",
-    type = str,
-    required = True,
-)
-
-parser.add_argument(
-    "--trainconfig",
-    help = "Training configuration file",
-    type = str,
-    required = True,
-)
-
-parser.add_argument(
-    "--condordir",
-    help = "Condor base directory (will create the job directory here)",
-    type = str,
-    required = False,
-    default = "training_results/condor_jobs"
-)
-
-parser.add_argument(
-    "--condorconfig",
-    help = "Configuration template",
-    type = str,
-    required = False,
-    default = "scripts/condor_config_template.submit"
-)
-
-parser.add_argument(
-    "--condorscript",
-    help = "Script (executable) template",
-    type = str,
-    required = False,
-    default = "scripts/condor_script_template.sh"
-)
-
-
 def main() :
+    
+    cwd = os.getcwd()
+    #cwd = "%s/src" %(subprocess.check_output(["echo", "$CMSSW_BASE"]).strip())
+    #proxy = subprocess.check_output(["voms-proxy-info", "--path"]).strip()
+    
+    
+    # Argument parser
+    parser = argparse.ArgumentParser(formatter_class = argparse.RawTextHelpFormatter)
+    
+    parser.add_argument(
+        "--tag",
+        help = "Will append \"_<tag>_<datetime>\" to the output directories",
+        type = str,
+        required = True,
+    )
+    
+    parser.add_argument(
+        "--trainconfig",
+        help = "Training configuration file",
+        type = str,
+        required = True,
+    )
+    
+    parser.add_argument(
+        "--pythonfile",
+        help = "Python file to be run",
+        type = str,
+        required = True,
+    )
+    
+    parser.add_argument(
+        "--condordir",
+        help = "Condor base directory (will create the job directory here)",
+        type = str,
+        required = False,
+        default = "training_results/condor_jobs/training"
+    )
+    
+    parser.add_argument(
+        "--condorconfig",
+        help = "Configuration template",
+        type = str,
+        required = False,
+        default = "configs/condor/condor_config_template_gpu.submit"
+    )
+    
+    parser.add_argument(
+        "--condorscript",
+        help = "Script (executable) template",
+        type = str,
+        required = False,
+        default = "scripts/condor/condor_script_template_training.sh"
+    )
     
     # Parse arguments
     args = parser.parse_args()
@@ -100,6 +106,7 @@ def main() :
         "@dir@": cwd,
         "@tag@": out_tag,
         "@cfg@": trainconfig,
+        "@pyf@": args.pythonfile,
         
         "@exe@": condorscript,
         "@log@": condor_log,
@@ -119,7 +126,7 @@ def main() :
                 filename = filename,
             ))
         
-        utils.run_cmd_list(l_cmd)
+        #utils.run_cmd_list(l_cmd)
     
     format_file(condorconfig, d_format)
     format_file(condorscript, d_format)
