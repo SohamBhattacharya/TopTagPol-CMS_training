@@ -200,11 +200,16 @@ def main() :
     nSlicePerBatch = int(batchSize/sliceSize)
     nCategory = len(d_loadConfig["categories"])
     
-    l_featureKey = ["points", "features", "mask"]
+    l_particleFeatureKey = ["points", "features", "mask"]
+    jetFeatureKey = "jetFeatures"
     
-    for key in l_featureKey :
+    for key in l_particleFeatureKey :
         
         assert(key in d_loadConfig)
+    
+    if jetFeatureKey not in d_loadConfig :
+        
+        jetFeatureKey = None
     
     d_catInfo_trn = utils.load_catInfo_from_config(d_loadConfig)
     d_catInfo_tst = utils.load_catInfo_from_config(d_loadConfig)
@@ -218,80 +223,84 @@ def main() :
     nCpu_frac = float(d_loadConfig["cpuFrac"])
     nCpu_use = int(nCpu_frac*nCpu)
     
-    pool = multiprocessing.Pool(processes = nCpu_use, maxtasksperchild = 1)
     l_job = []
     
-    for (iCat, cat) in enumerate(d_catInfo_trn.keys()) :
+    with multiprocessing.Pool(
+        processes = nCpu_use,
+        #maxtasksperchild = 1
+    ) as pool :
         
-        catInfo_trn = d_catInfo_trn[cat]
-        catInfo_tst = d_catInfo_tst[cat]
+        for (iCat, cat) in enumerate(d_catInfo_trn.keys()) :
+            
+            catInfo_trn = d_catInfo_trn[cat]
+            catInfo_tst = d_catInfo_tst[cat]
+            
+            for iSample, l_fileAndTreeName in enumerate(catInfo_trn.l_sample_fileAndTreeName):
+                
+                l_job.append(pool.apply_async(
+                    particle_dataloader.loadSliceInfo,
+                    (),
+                    dict(
+                        catNum = cat,
+                        sampleIdx = iSample,
+                        catInfo = catInfo_trn,
+                        sliceSize = sliceSize,
+                    ),
+                ))
         
-        for iSample, l_fileAndTreeName in enumerate(catInfo_trn.l_sample_fileAndTreeName):
-            
-            l_job.append(pool.apply_async(
-                particle_dataloader.loadSliceInfo,
-                (),
-                dict(
-                    catNum = cat,
-                    sampleIdx = iSample,
-                    catInfo = catInfo_trn,
-                    sliceSize = sliceSize,
-                ),
-            ))
-    
-    pool.close()
-    
-    l_isJobDone = [False] * len(l_job)
-    
-    while(False in l_isJobDone) :
+        pool.close()
         
-        for iJob, job in enumerate(l_job) :
+        l_isJobDone = [False] * len(l_job)
+        
+        while(False in l_isJobDone) :
             
-            if (job is None) :
+            for iJob, job in enumerate(l_job) :
                 
-                continue
-            
-            if (not l_isJobDone[iJob] and job.ready()) :
-                
-                l_isJobDone[iJob] = True
-                
-                d_result = job.get()
-                
-                catNum              = d_result["catNum"]
-                sampleIdx           = d_result["sampleIdx"]
-                nJet_sample         = d_result["nJet_sample"]
-                nSlice_sample       = d_result["nSlice_sample"]
-                d_sliceInfo_sample  = d_result["d_sliceInfo_sample"]
-                
-                catInfo_trn = d_catInfo_trn[catNum]
-                catInfo_tst = d_catInfo_tst[catNum]
-                
-                nSlice_tst_sample = int(d_loadConfig["testFraction"] * nSlice_sample)
-                nSlice_trn_sample = nSlice_sample - nSlice_tst_sample
-                
-                for key in d_sliceInfo_trn.keys() :
+                if (job is None) :
                     
-                    #print("$"*50, key, len(d_sliceInfo_sample[key][0: nSlice_trn_sample]))
-                    #print("&"*50, key, len(d_sliceInfo_sample[key][nSlice_trn_sample:]))
-                    d_sliceInfo_trn[key].extend(d_sliceInfo_sample[key][0: nSlice_trn_sample])
-                    d_sliceInfo_tst[key].extend(d_sliceInfo_sample[key][nSlice_trn_sample:])
+                    continue
                 
-                catInfo_trn.l_sample_nJet[sampleIdx] += nSlice_trn_sample*sliceSize
-                catInfo_tst.l_sample_nJet[sampleIdx] += nSlice_tst_sample*sliceSize
-                
-                l_job[iJob] = None
-                
-                print("Loaded slices for [cat %d, sample %d]. Jobs done: %d/%d." %(catNum, sampleIdx, sum(l_isJobDone), len(l_isJobDone)))
-                
-                if (not sum(l_isJobDone) % 10) :
+                if (not l_isJobDone[iJob] and job.ready()) :
                     
-                    gc.collect()
+                    l_isJobDone[iJob] = True
+                    
+                    d_result = job.get()
+                    
+                    catNum              = d_result["catNum"]
+                    sampleIdx           = d_result["sampleIdx"]
+                    nJet_sample         = d_result["nJet_sample"]
+                    nSlice_sample       = d_result["nSlice_sample"]
+                    d_sliceInfo_sample  = d_result["d_sliceInfo_sample"]
+                    
+                    catInfo_trn = d_catInfo_trn[catNum]
+                    catInfo_tst = d_catInfo_tst[catNum]
+                    
+                    nSlice_tst_sample = int(d_loadConfig["testFraction"] * nSlice_sample)
+                    nSlice_trn_sample = nSlice_sample - nSlice_tst_sample
+                    
+                    for key in d_sliceInfo_trn.keys() :
+                        
+                        #print("$"*50, key, len(d_sliceInfo_sample[key][0: nSlice_trn_sample]))
+                        #print("&"*50, key, len(d_sliceInfo_sample[key][nSlice_trn_sample:]))
+                        d_sliceInfo_trn[key].extend(d_sliceInfo_sample[key][0: nSlice_trn_sample])
+                        d_sliceInfo_tst[key].extend(d_sliceInfo_sample[key][nSlice_trn_sample:])
+                    
+                    catInfo_trn.l_sample_nJet[sampleIdx] += nSlice_trn_sample*sliceSize
+                    catInfo_tst.l_sample_nJet[sampleIdx] += nSlice_tst_sample*sliceSize
+                    
+                    l_job[iJob] = None
+                    
+                    print("Loaded slices for [cat %d, sample %d]. Jobs done: %d/%d." %(catNum, sampleIdx, sum(l_isJobDone), len(l_isJobDone)))
+                    
+                    if (not sum(l_isJobDone) % 10) :
+                        
+                        gc.collect()
+        
+        pool.join()
     
-    pool.join()
     
-    
-    print(catInfo_trn.l_sample_nJet)
-    print(catInfo_tst.l_sample_nJet)
+    print("catInfo_trn.l_sample_nJet", catInfo_trn.l_sample_nJet)
+    print("catInfo_tst.l_sample_nJet", catInfo_tst.l_sample_nJet)
     
     
     #print("#"*50, iCat, iSample, len(d_sliceInfo_trn["a_sampleIdx"]), len(d_sliceInfo_tst["a_sampleIdx"]))
@@ -339,7 +348,8 @@ def main() :
         d_catInfo = d_catInfo_trn,
         d_sliceInfo = d_sliceInfo_trn,
         a_sliceIdx_batched = a_sliceIdx_shf_batched,
-        l_featureKey = l_featureKey,
+        l_particleFeatureKey = l_particleFeatureKey,
+        jetFeatureKey = jetFeatureKey,
         sliceSize = sliceSize,
         batchSize = batchSize,
         #nBatch = nBatch,
@@ -354,7 +364,8 @@ def main() :
         d_catInfo = d_catInfo_trn,
         d_sliceInfo = d_sliceInfo_tst,
         a_sliceIdx_batched = [numpy.arange(0, nSlice_tst)],
-        l_featureKey = l_featureKey,
+        l_particleFeatureKey = l_particleFeatureKey,
+        jetFeatureKey = jetFeatureKey,
         sliceSize = sliceSize,
         batchSize = nSlice_tst*sliceSize,
         #nBatch = nBatch,
@@ -367,6 +378,7 @@ def main() :
     dataloader_tst.close()
     print("Loaded testing data.")
     #print(dataset_tst[0])
+    #print(dataset_tst[0][jetFeatureKey])
     #print(dataset_tst[1])
     #print(dataset_tst[1].shape)
     
@@ -411,27 +423,64 @@ def main() :
     
     #model = get_particle_net(nCategory, input_shapes = dataloader_trn.d_data_inputShape)
     #model = get_particle_net_lite(nCategory, input_shapes = dataloader_trn.d_data_inputShape)
-    model = getattr(tf_keras_model, network_fn_name)(nCategory, input_shapes = dataloader_trn.d_data_inputShape)
     
-    lr_boundaries = [_lrEpoch * nBatch for _lrEpoch in d_loadConfig["learningRate"]["epoch"]]
-    lr_values = d_loadConfig["learningRate"]["rate"]
+    model = None
+    lr_reduce_callback = None
     
-    lr_schedule = tensorflow.keras.optimizers.schedules.PiecewiseConstantDecay(
-        boundaries = lr_boundaries,
-        values = lr_values,
-    )
+    if ("loadModel" in d_loadConfig) :
+        
+        print("Loading model: %s" %(d_loadConfig["loadModel"]))
+        model = tensorflow.keras.models.load_model(d_loadConfig["loadModel"], compile = True)
     
-    optimizer = tensorflow.keras.optimizers.Adam(
-        learning_rate = lr_schedule
-    )
+    else :
+        
+        model = getattr(tf_keras_model, network_fn_name)(nCategory, input_shapes = dataloader_trn.d_data_inputShape)
+        
+        learning_rate = None
+        
+        if ("epoch" in d_loadConfig["learningRate"] and "rate" in d_loadConfig["learningRate"]) :
+            
+            lr_boundaries = [_lrEpoch * nBatch for _lrEpoch in d_loadConfig["learningRate"]["epoch"]]
+            lr_values = d_loadConfig["learningRate"]["rate"]
+            
+            lr_schedule = tensorflow.keras.optimizers.schedules.PiecewiseConstantDecay(
+                boundaries = lr_boundaries,
+                values = lr_values,
+            )
+            
+            learning_rate = lr_schedule
+        
+        elif (isinstance(d_loadConfig["learningRate"], float)) :
+            
+            learning_rate = d_loadConfig["learningRate"]
+            
+            lr_reduce_callback = tf.keras.callbacks.ReduceLROnPlateau(
+                monitor = "val_loss",
+                factor = 0.1,
+                patience = 3,
+                verbose = 1,
+                mode = "auto",
+                min_delta = 1e-4,
+                min_lr = 1e-6,
+            )
+        
+        
+        assert(learning_rate is not None)
+        
+        
+        optimizer = tensorflow.keras.optimizers.Adam(
+            learning_rate = learning_rate
+        )
+        
+        model.compile(
+            loss = "categorical_crossentropy",
+            optimizer = optimizer,
+            metrics = [
+                "accuracy",
+            ],
+        )
     
-    model.compile(
-        loss = "categorical_crossentropy",
-        optimizer = optimizer,
-        metrics = [
-            "accuracy",
-        ],
-    )
+    assert(model is not None)
     
     model_summary_str = []
     model.summary(print_fn = lambda x: model_summary_str.append(x))
@@ -496,12 +545,22 @@ def main() :
     )
     
     
+    l_callback = [
+        checkpoint_callback,
+        tensorboard_callback,
+        mylog_callback,
+    ]
+    
+    if (lr_reduce_callback is not None) :
+        
+        l_callback.append(lr_reduce_callback)
+    
     model.fit(
         x = dataset_trn,
         epochs = d_loadConfig["nEpoch"],
         validation_data = dataset_tst,
         shuffle = False,
-        callbacks = [checkpoint_callback, tensorboard_callback, mylog_callback],
+        callbacks = l_callback,
     )
     
     

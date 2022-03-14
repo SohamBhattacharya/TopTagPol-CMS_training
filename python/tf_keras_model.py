@@ -77,7 +77,7 @@ def edge_conv(points, features, num_points, K, channels, with_bn=True, activatio
             return sc + fts
 
 
-def _particle_net_base(points, features=None, mask=None, setting=None, name='particle_net'):
+def _particle_net_base(points, features=None, mask=None, jetFeatures = None, setting=None, name='particle_net'):
     # points : (N, P, C_coord)
     # features:  (N, P, C_features), optional
     # mask: (N, P, 1), optinal
@@ -104,6 +104,12 @@ def _particle_net_base(points, features=None, mask=None, setting=None, name='par
 
         if setting.fc_params is not None:
             x = pool
+            
+            if (jetFeatures is not None) :
+                
+                #x = tensorflow.concat([x, jetFeatures], axis = 1)
+                x = tf.keras.layers.Concatenate(axis = 1)([x, jetFeatures])
+            
             for layer_idx, layer_param in enumerate(setting.fc_params):
                 units, drop_rate = layer_param
                 x = keras.layers.Dense(units, activation='relu')(x)
@@ -196,9 +202,6 @@ def get_particle_net_mod1(num_classes, input_shapes):
     setting.num_class = num_classes
     # conv_params: list of tuple in the format (K, (C1, C2, C3))
     setting.conv_params = [
-        #(32, (128, 128, 128)),
-        #(32, (256, 256, 256)),
-        #(32, (512, 512, 512)),
         (64, (64, 64, 64)),
         (64, (128, 128, 128)),
         (64, (256, 256, 256)),
@@ -212,6 +215,40 @@ def get_particle_net_mod1(num_classes, input_shapes):
     points = keras.Input(name='points', shape=input_shapes['points'])
     features = keras.Input(name='features', shape=input_shapes['features']) if 'features' in input_shapes else None
     mask = keras.Input(name='mask', shape=input_shapes['mask']) if 'mask' in input_shapes else None
+    jetFeatures = keras.Input(name='jetFeatures', shape=input_shapes['jetFeatures']) if 'jetFeatures' in input_shapes else None
+    outputs = _particle_net_base(points, features, mask, jetFeatures, setting, name='ParticleNet')
+
+    return keras.Model(inputs=[points, features, mask, jetFeatures], outputs=outputs, name='ParticleNet')
+
+
+def get_particle_net_mod2(num_classes, input_shapes):
+    r"""ParticleNet model from `"ParticleNet: Jet Tagging via Particle Clouds"
+    <https://arxiv.org/abs/1902.08570>`_ paper.
+    Parameters
+    ----------
+    num_classes : int
+        Number of output classes.
+    input_shapes : dict
+        The shapes of each input (`points`, `features`, `mask`).
+    """
+    setting = _DotDict()
+    setting.num_class = num_classes
+    # conv_params: list of tuple in the format (K, (C1, C2, C3))
+    setting.conv_params = [
+        (64, (64, 64, 64)),
+        (64, (128, 128, 128)),
+        (64, (256, 256, 256)),
+        (64, (256, 256, 256)),
+        ]
+    # conv_pooling: 'average' or 'max'
+    setting.conv_pooling = 'average'
+    # fc_params: list of tuples in the format (C, drop_rate)
+    setting.fc_params = [(512, 0.1), (512, 0.1)]
+    setting.num_points = input_shapes['points'][0]
+
+    points = keras.Input(name='points', shape=input_shapes['points'])
+    features = keras.Input(name='features', shape=input_shapes['features']) if 'features' in input_shapes else None
+    mask = keras.Input(name='mask', shape=input_shapes['mask']) if 'mask' in input_shapes else None
     outputs = _particle_net_base(points, features, mask, setting, name='ParticleNet')
 
-    return keras.Model(inputs=[points, features, mask], outputs=outputs, name='ParticleNet')
+    return keras.Model(inputs=[points, features, mask, ], outputs=outputs, name='ParticleNet')

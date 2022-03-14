@@ -6,3 +6,18 @@ pnet_more:training_results/tensorboard/particle_net_more-features_2022-02-22_19-
 pnet_more_wxy:training_results/tensorboard/particle_net_more-features-with-xy_2022-02-22_22-59-41,\
 pnet_more_wxy_lessQCD:training_results/tensorboard/particle_net_more-features-with-xy_400K-per-QCD_2022-02-23_09-56-18,\
 pnet_more_wxy_2:training_results/tensorboard/particle_net_more-features-with-xy_500K-per-QCD_with-TTJets-HT-800to1200_2022-02-23_23-03-31
+
+
+
+tensorboard --port 6006 --reload_multifile True \
+--logdir_spec \
+pnet_mod1:training_results/tensorboard/particle_net_mod1_with-Wprimetotb_2022-03-07_13-37-34,\
+pnet_mod1_ak8:training_results/tensorboard/particle_net_mod1_ak8_2022-03-08_16-28-43,\
+pnet_mod1_wjm:training_results/tensorboard/particle_net_mod1_with-jetMass_2022-03-11_17-55-18
+
+
+tensorboard --port 6006 --reload_multifile True \
+--logdir_spec \
+pnet_mod1:training_results/tensorboard/particle_net_mod1_with-Wprimetotb_2022-03-07_13-37-34,\
+pnet_mod1_ext:training_results/tensorboard/particle_net_mod1_with-Wprimetotb_2022-03-07_13-37-34_ext1,\
+pnet_mod1_wjm:training_results/tensorboard/particle_net_mod1_with-jetMass_2022-03-11_17-55-18
